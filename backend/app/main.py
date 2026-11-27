@@ -7,7 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth import ensure_admin
 from .config import settings
 from .db import SessionLocal, init_db
-from .routes import admin_data, admin_settings, admin_stats, admin_timetable, auth, imports
+from .routes import (
+    admin_data,
+    admin_settings,
+    admin_stats,
+    admin_timetable,
+    auth,
+    export,
+    imports,
+    prof,
+    public,
+)
 
 
 @asynccontextmanager
@@ -21,7 +31,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     description="Smart timetables for the department: import, generate, absences, extra sessions.",
-    version="0.3.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 app.add_middleware(
@@ -31,8 +41,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth.router, admin_data.router, imports.router, admin_timetable.router,
-          admin_stats.router, admin_settings.router):
+for r in (auth.router, admin_data.router, imports.router, admin_timetable.router, admin_settings.router,
+          admin_stats.router, prof.router, public.router, export.router):
     app.include_router(r)
 
 
