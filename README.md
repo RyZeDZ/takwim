@@ -87,9 +87,3 @@ a professor is absent and another books the freed room) also run on their own wi
 - A practical class needs a lab at least as large as the group.
 - Scanned paper (photos) is not read; PDFs exported from Word or Excel are.
 - All data in the demo is synthetic: no real names or personal data.
-
-## Credits
-
-Open-source libraries: FastAPI, SQLAlchemy, Pydantic, Uvicorn, openpyxl, pdfplumber, ReportLab,
-Google OR-Tools (CP-SAT), llama.cpp / llama-cpp-python, React, React Router, Vite,
-vite-plugin-pwa, qrcode.react, Instrument Sans font. Model: Qwen2.5-1.5B-Instruct (Apache 2.0).

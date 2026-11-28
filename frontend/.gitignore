@@ -25,3 +25,6 @@ dist-ssr
 
 # local settings
 .env
+
+# TLS certificate and key for server.mjs (never commit them)
+certs/
