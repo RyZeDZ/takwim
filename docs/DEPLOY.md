@@ -52,4 +52,30 @@ server {
 }
 ```
 
+### Only one subdomain? Put the API under `/api`
+
+Build with `VITE_API_URL=https://app.example.com/api`, set `CORS_ORIGINS=https://app.example.com`,
+and use one server block:
+
+```nginx
+server {
+  server_name app.example.com;
+  root /path/to/frontend/dist;
+  location /api/ { proxy_pass http://127.0.0.1:8000/; proxy_read_timeout 120s; }
+  location / { try_files $uri /index.html; }
+}
+```
+
+The trailing `/` after `8000` removes `/api` before the request reaches the API.
+
+## 3. Before the jury tests it
+
+- Run a single API process (no `--workers`): the database is one SQLite file.
+- Memory: about 0.5 GB while generating, plus about 1.9 GB when the language model is loaded
+  for an import. On a server with less than 3 GB of RAM, leave `COLUMN_MAPPER_MODULE` empty
+  (imports then use the dictionary only).
+- Set up the demo once (Load demo department, Generate), copy the professor logins, then make a
+  copy of `backend/timetable.db`. Between two jury sessions, stop the API, put the copy back and
+  start it again to return to a clean state.
+
 The database is the file `backend/timetable.db`: back it up by copying it.

@@ -26,6 +26,9 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        // API on the same domain under /api (downloads are page navigations): never answer
+        // those with the app page.
+        navigateFallbackDenylist: [/^\/api\//, /^\/docs/],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
       },
     }),
