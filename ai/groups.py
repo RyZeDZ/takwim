@@ -1,8 +1,9 @@
 """
 Takwim - group builder (Person 2).
 
-Turns level headcounts into sections and groups.
-No student names are used, only headcounts.
+Turns level headcounts into sections and groups, and lists the sessions
+each group must have per week. No student names are used, only headcounts.
+Used by the solver (real data) and by generate.py (mock data).
 
     Section 1        -> attends lectures (Cours) in an amphi
       G1, G2, G3 ... -> at most 40 students, attends TD in a TD room
@@ -18,6 +19,7 @@ Usage:
 import json
 import math
 import sys
+from collections import defaultdict
 
 
 def split_evenly(total, parts):
@@ -59,6 +61,22 @@ def build_groups(dept):
                 groups.append({"id": f"{sec_id}-G{g_num}", "name": f"{short} · G{g_num}", **base,
                                "kind": "group", "parent": sec_id, "size": g_size})
     return groups
+
+
+def session_demand(dept, groups):
+    """List of (module, kind, group) sessions to teach per week.
+    A lecture is for a section, a TD or TP for each group of that section.
+    e.g. L1 module with 1 lecture + 1 TD and 6 groups -> 1 + 6 = 7 sessions."""
+    demand = []
+    by_level = defaultdict(list)
+    for g in groups:
+        by_level[(g["level"], g["kind"])].append(g)
+    kind_group = {"lecture": "section", "td": "group", "tp": "group"}
+    for m in dept["modules"]:
+        for kind, per_week in m["weekly"].items():
+            for g in by_level[(m["level"], kind_group[kind])]:
+                demand += [(m["id"], kind, g["id"])] * per_week
+    return demand
 
 
 def family(group_id, groups):

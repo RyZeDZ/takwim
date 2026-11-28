@@ -31,12 +31,14 @@ import os
 import random
 from collections import defaultdict
 
-from groups import build_groups
+from groups import build_groups, session_demand
 
 # --------------------------------------------------------------------------
 # Fixed reference data
 # --------------------------------------------------------------------------
-DAYS = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu"]          # week starts on Saturday
+# the admin chooses the study week: Saturday-Thursday or Sunday-Thursday (--week sat / sun)
+WEEKS = {"sat": ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu"],
+         "sun": ["Sun", "Mon", "Tue", "Wed", "Thu"]}
 DAYS_FR = {"Sat": "Samedi", "Sun": "Dimanche", "Mon": "Lundi", "Tue": "Mardi",
            "Wed": "Mercredi", "Thu": "Jeudi"}
 SLOTS = [("08:00", "09:30"), ("09:30", "11:00"), ("11:00", "12:30"),
@@ -164,7 +166,6 @@ SIZES = {
     "small": {
         # one common level + one L3 speciality + one master speciality
         "levels": {"L1-INFO": 90, "L3-ISIL": 60, "M1-IA": 28},
-        "saturday_years": ["L1", "L3"],          # which years can have classes on Saturday
         "modules_per_level": 4,
         "rooms": [("Amphi 1", "amphi", 120),
                   ("Salle 1", "td", 40), ("Salle 2", "td", 40), ("Salle 3", "td", 32),
@@ -175,7 +176,6 @@ SIZES = {
         "levels": {"L1-INFO": 240, "L2-INFO": 200, "L3-ISIL": 90, "L3-SI": 70,
                    "M1-IA": 32, "M1-SECU": 28, "M1-GL": 30, "M1-DS": 30, "M1-RES": 25,
                    "M2-IA": 28, "M2-SECU": 25, "M2-GL": 27, "M2-DS": 26, "M2-RES": 22},
-        "saturday_years": ["L1", "L2", "L3"],    # which years can have classes on Saturday
         "modules_per_level": None,  # all of them
         # (name, type, capacity): write the names your department uses
         "rooms": [("Amphi 1", "amphi", 250), ("Amphi 2", "amphi", 220), ("Amphi 3", "amphi", 150),
@@ -199,8 +199,6 @@ RULES = {
     "group_max": 40,      # a group never has more than 40 students
     "max_sessions_per_day_group": 4,
     "max_sessions_per_day_prof": 4,
-    # soft rule: use these days only if needed (each level's "days" says if it is allowed at all)
-    "avoid_days": ["Sat"],
     # allowed room types per kind of session (capacity must also fit the group).
     # Small master sections can have their lectures in a TD room.
     "room_types_for": {"lecture": ["amphi", "td"], "td": ["td"], "tp": ["lab"]},
@@ -210,33 +208,64 @@ RULES = {
 # --------------------------------------------------------------------------
 # Generation
 # --------------------------------------------------------------------------
-def make_department(size, seed):
+def make_department(size, seed, vary=False, week="sat"):
     rnd = random.Random(seed)
     cfg = SIZES[size]
+    # --vary uses its OWN random generator, so without --vary the department
+    # is exactly the same as before for a given seed.
+    vr = random.Random(seed * 7919 + 1)
+    changes = []          # human-readable list of what --vary changed
 
+    DAYS = WEEKS[week]
     calendar = {"days": DAYS,
                 "slots": [{"id": i, "start": s, "end": e} for i, (s, e) in enumerate(SLOTS)]}
 
     levels = []
     for lid, hc in cfg["levels"].items():
         year, spec, name = LEVELS[lid]
-        days = DAYS if year in cfg["saturday_years"] else [d for d in DAYS if d != "Sat"]
+        if vary:                                   # +/- 20% students
+            new_hc = max(15, round(hc * vr.uniform(0.8, 1.2)))
+            if new_hc != hc:
+                changes.append(f"{lid}: {hc} -> {new_hc} students")
+            hc = new_hc
         levels.append({"id": lid, "year": year, "speciality": spec, "name": name,
-                       "headcount": hc, "days": days})
+                       "headcount": hc, "days": list(DAYS)})       # every level follows the study week
 
     rooms = []
     for name, rtype, cap in cfg["rooms"]:
         rooms.append({"id": name.replace(" ", "-"),      # "Salle A-2" -> "Salle-A-2"
                       "name": name, "type": rtype, "capacity": cap})
+    if vary:                                       # close 0-2 TD rooms and 0-2 labs
+        for rtype in ("td", "lab"):
+            for _ in range(vr.randint(0, 2)):
+                same = [r for r in rooms if r["type"] == rtype]
+                big = [r for r in same if r["capacity"] >= RULES["group_max"]]
+                # never close a room if fewer than 3 big ones (40+ seats) would remain
+                cands = [r for r in same if r["capacity"] < RULES["group_max"] or len(big) > 3]
+                if len(same) > 3 and cands:
+                    closed = vr.choice(cands)
+                    rooms.remove(closed)
+                    changes.append(f"room closed: {closed['name']}")
 
     modules = []
     for lid in cfg["levels"]:
         chosen = MODULES[lid][: cfg["modules_per_level"]] if cfg["modules_per_level"] else MODULES[lid]
         for code, name, td, tp, theme in chosen:
+            if vary:                               # sometimes drop or add a TD/TP
+                r = vr.random()
+                if r < 0.10 and td:
+                    td = 0
+                    changes.append(f"{lid}-{code}: no TD")
+                elif r < 0.20 and tp:
+                    tp = 0
+                    changes.append(f"{lid}-{code}: no TP")
+                elif r < 0.27 and not tp and theme != "misc":
+                    tp = 1
+                    changes.append(f"{lid}-{code}: TP added")
             modules.append({"id": f"{lid}-{code}", "name": name, "level": lid,
                             "theme": theme, "weekly": {"lecture": 1, "td": td, "tp": tp}})
 
-    dept = {"meta": {"size": size, "seed": seed}, "calendar": calendar, "rules": RULES,
+    dept = {"meta": {"size": size, "seed": seed, "vary": vary, "changes": changes}, "calendar": calendar, "rules": RULES,
             "levels": levels, "rooms": rooms, "modules": modules,
             "professors": [], "unavailability": []}
 
@@ -251,9 +280,15 @@ def make_department(size, seed):
                 return n
 
     profs = []
-    n_total = cfg["n_profs"] + cfg["n_vacataires"]
+    n_perm, n_vac = cfg["n_profs"], cfg["n_vacataires"]
+    if vary:                                       # a few professors more or fewer
+        dp, dv = vr.randint(-4, 3), vr.randint(-3, 3)
+        n_perm, n_vac = max(3, n_perm + dp), max(0, n_vac + dv)
+        if dp or dv:
+            changes.append(f"professors: {cfg['n_profs']}+{cfg['n_vacataires']} -> {n_perm}+{n_vac}")
+    n_total = n_perm + n_vac
     for i in range(n_total):
-        vac = i >= cfg["n_profs"]
+        vac = i >= n_perm
         grade = "Vacataire" if vac else rnd.choice(["MCA", "MCB", "MAA", "Professeur"])
         themes = rnd.sample(THEMES, 2)  # a main + a secondary specialty
         profs.append({"id": f"P{i + 1:02d}", "name": new_name(), "grade": grade,
@@ -274,8 +309,27 @@ def make_department(size, seed):
             if kinds:
                 p["voeux"].append({"module": m["id"], "kinds": kinds, "rank": rank})
 
-    # make sure the professors can actually cover every session (greedy check)
     groups = build_groups(dept)
+
+    # with --vary, hire extra professors if the teaching load is too high (> 80%)
+    if vary:
+        hours = RULES["session_minutes"] / 60
+        need = len(session_demand(dept, groups)) * hours
+        added = 0
+        while sum(p["max_hours"] for p in profs) * 0.8 < need:
+            themes = rnd.sample(THEMES, 2)
+            profs.append({"id": f"P{len(profs) + 1:02d}", "name": new_name(), "grade": "MAA",
+                          "max_hours": 12, "voeux": [], "_themes": themes, "_vac": False})
+            main = [m for m in modules if m["theme"] == themes[0]]
+            rnd.shuffle(main)
+            for rank, m in enumerate(main[:4], 1):
+                kinds = [k for k in ("lecture", "td", "tp") if m["weekly"][k]]
+                profs[-1]["voeux"].append({"module": m["id"], "kinds": kinds, "rank": rank})
+            added += 1
+        if added:
+            changes.append(f"hired {added} extra professor(s) to cover the load")
+
+    # make sure the professors can actually cover every session (greedy check)
     ensure_coverage(dept, profs, groups)
 
     for p in profs:
@@ -290,26 +344,24 @@ def make_department(size, seed):
         if rnd.random() < 0.3:  # sometimes a whole morning, e.g. "no Sunday mornings"
             d = rnd.choice(DAYS)
             blocked |= {(d, s) for s in (0, 1, 2)}
-        if rnd.random() < 0.5:  # half the professors never teach on Saturday
+        if "Sat" in DAYS and rnd.random() < 0.5:  # half the professors never teach on Saturday
             blocked |= {("Sat", s) for s in range(len(SLOTS))}
         for d, s in sorted(blocked, key=lambda x: (DAYS.index(x[0]), x[1])):
             dept["unavailability"].append({"prof": p["id"], "day": d, "slot": s})
 
+    # ---- dislikes (soft preferences: "I'd rather not") ---------------------
+    # about 40% of professors dislike 1 or 2 things: 08:00, the last slot,
+    # a whole day, or one slot on one day. The solver tries to respect them.
+    for p in profs:
+        p["dislikes"] = []
+        if rnd.random() < 0.4:
+            options = [{"day": "all", "slot": 0},
+                       {"day": "all", "slot": len(SLOTS) - 1},
+                       {"day": rnd.choice(DAYS), "slot": "all"},
+                       {"day": rnd.choice(DAYS), "slot": rnd.randrange(len(SLOTS))}]
+            p["dislikes"] = rnd.sample(options, rnd.randint(1, 2))
+
     return dept, groups
-
-
-def session_demand(dept, groups):
-    """List of (module, kind, group) sessions to teach per week."""
-    demand = []
-    by_level = defaultdict(list)
-    for g in groups:
-        by_level[(g["level"], g["kind"])].append(g)
-    kind_group = {"lecture": "section", "td": "group", "tp": "group"}
-    for m in dept["modules"]:
-        for kind, per_week in m["weekly"].items():
-            for g in by_level[(m["level"], kind_group[kind])]:
-                demand += [(m["id"], kind, g["id"])] * per_week
-    return demand
 
 
 def ensure_coverage(dept, profs, groups):
@@ -359,9 +411,8 @@ def write_messy(dept, folder, xlsx_path):
     rtype_fr = {"amphi": "Amphithéâtre", "td": "Salle TD", "lab": "Labo TP"}
 
     tables = {
-        "niveaux": (["Année", "Spécialité", "Intitulé de la formation", "Effectif", "Cours le samedi"],
-                    [[l["year"], l["speciality"], l["name"], l["headcount"],
-                      "Oui" if "Sat" in l["days"] else "Non"] for l in dept["levels"]]),
+        "niveaux": (["Année", "Spécialité", "Intitulé de la formation", "Effectif"],
+                    [[l["year"], l["speciality"], l["name"], l["headcount"]] for l in dept["levels"]]),
         "salles": (["Salle", "Type de salle", "Capacité"],
                    [[r["name"], rtype_fr[r["type"]], r["capacity"]] for r in dept["rooms"]]),
         "modules": (["Intitulé du module", "Année", "Spécialité", "Cours/sem", "TD/sem", "TP/sem"],
@@ -381,7 +432,12 @@ def write_messy(dept, folder, xlsx_path):
     tables["disponibilites"] = (
         ["Enseignant", "Jour"] + slot_cols,
         [[p["name"], DAYS_FR[d]] + ["X" if (p["id"], d, s) in blocked else "" for s in range(len(SLOTS))]
-         for p in dept["professors"] for d in DAYS])
+         for p in dept["professors"] for d in dept["calendar"]["days"]])
+    slot_fr = {"all": "Toute la journée", **{i: c for i, c in enumerate(slot_cols)}}
+    tables["preferences"] = (
+        ["Enseignant", "Jour à éviter", "Créneau à éviter"],
+        [[p["name"], "Tous les jours" if d["day"] == "all" else DAYS_FR[d["day"]], slot_fr[d["slot"]]]
+         for p in dept["professors"] for d in p.get("dislikes", [])])
 
     for name, (header, rows) in tables.items():
         with open(os.path.join(folder, f"{name}.csv"), "w", newline="", encoding="utf-8-sig") as f:
@@ -391,8 +447,7 @@ def write_messy(dept, folder, xlsx_path):
 
     truth = {
         "niveaux.csv": {"Année": "level.year", "Spécialité": "level.speciality",
-                        "Intitulé de la formation": "level.name", "Effectif": "level.headcount",
-                        "Cours le samedi": "level.days.saturday"},
+                        "Intitulé de la formation": "level.name", "Effectif": "level.headcount"},
         "salles.csv": {"Salle": "room.name", "Type de salle": "room.type",
                        "Capacité": "room.capacity"},
         "modules.csv": {"Intitulé du module": "module.name", "Année": "module.year",
@@ -404,6 +459,8 @@ def write_messy(dept, folder, xlsx_path):
                             "Module souhaité": "voeu.module", "Formation": "voeu.level",
                             "Nature (Cours/TD/TP)": "voeu.kinds",
                             "Ordre de préférence": "voeu.rank"},
+        "preferences.csv": {"Enseignant": "dislike.prof", "Jour à éviter": "dislike.day",
+                            "Créneau à éviter": "dislike.slot"},
         "disponibilites.csv": {"Enseignant": "availability.prof", "Jour": "availability.day",
                                **{c: f"availability.slot.{i}" for i, c in enumerate(slot_cols)}},
     }
@@ -427,7 +484,7 @@ def write_messy(dept, folder, xlsx_path):
 # --------------------------------------------------------------------------
 def print_stats(dept, groups):
     demand = session_demand(dept, groups)
-    n_slots = len(DAYS) * len(SLOTS)
+    n_slots = len(dept["calendar"]["days"]) * len(SLOTS)
     hours = dept["rules"]["session_minutes"] / 60
     by_id = {g["id"]: g for g in groups}
     rooms = dept["rooms"]
@@ -474,17 +531,25 @@ def main():
     ap.add_argument("--size", choices=SIZES, default="real")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="out")
+    ap.add_argument("--week", choices=WEEKS, default="sat",
+                    help="study week chosen by the admin: sat = Saturday-Thursday, sun = Sunday-Thursday")
+    ap.add_argument("--vary", action="store_true",
+                    help="also randomise headcounts, rooms, TD/TP and number of professors")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
-    dept, groups = make_department(args.size, args.seed)
+    dept, groups = make_department(args.size, args.seed, vary=args.vary, week=args.week)
     with open(os.path.join(args.out, f"department_{args.size}.json"), "w", encoding="utf-8") as f:
         json.dump(dept, f, ensure_ascii=False, indent=2)
     with open(os.path.join(args.out, f"groups_{args.size}.json"), "w", encoding="utf-8") as f:
         json.dump(groups, f, ensure_ascii=False, indent=2)
     write_messy(dept, os.path.join(args.out, f"messy_{args.size}"),
                 os.path.join(args.out, f"messy_{args.size}.xlsx"))
-    print(f"Wrote {args.out}/ (size={args.size}, seed={args.seed})")
+    print(f"Wrote {args.out}/ (size={args.size}, seed={args.seed}, week={args.week}{', varied' if args.vary else ''})")
+    if args.vary:
+        print(f"  {len(dept['meta']['changes'])} changes from the base department:")
+        for c in dept["meta"]["changes"]:
+            print("   -", c)
     print_stats(dept, groups)
 
 
