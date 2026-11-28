@@ -22,6 +22,6 @@ def test_availability_grid(client, admin, demo):
 
 def test_group_tree(client, demo):
     tree = client.get("/public/groups").json()
-    l1 = next(x for x in tree if x["level"] == "L1 CS")
+    l1 = next(x for x in tree if x["level"] == "L1 INFO")
     tds = l1["sections"][0]["children"]
     assert len(tds) == 6 and all(t["children"] == [] for t in tds)  # the TD group does the TP

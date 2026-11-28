@@ -142,7 +142,7 @@ function flatGroups(node: GroupNode): GroupNode[] {
   return out.length ? out : [node]
 }
 
-/** "L1 CS - G3" -> "G3" (the level is already the card title). */
+/** "L1 INFO - G3" -> "G3" (the level is already the card title). */
 const shortName = (name: string) => name.split(' - ').slice(1).join(' - ') || name
 
 // ------------------------------------------------------------------ a group's week

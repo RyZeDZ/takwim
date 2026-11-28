@@ -108,7 +108,7 @@ Automated coverage already in place: `cd backend && pytest -q` (50 tests) and
 - [ ] E3 The group page also shows the section's lectures.
 - [ ] E4 Share → QR code and link; scanning it on a phone opens the same page.
 - [ ] E5 PDF / Excel download of the group.
-- [ ] E6 Reopen the home page → "Open L1 CS - G3" shortcut to the last group viewed.
+- [ ] E6 Reopen the home page → "Open L1 INFO - G3" shortcut to the last group viewed.
 - [ ] E7 Free rooms: pick a date and time → list of free rooms, freed ones labelled.
 - [ ] E8 On a Friday / Saturday the page shows the coming week by default.
 - [ ] E9 Before any generation → "No timetable published yet".

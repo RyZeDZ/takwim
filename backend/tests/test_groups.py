@@ -3,7 +3,7 @@ def test_groups_are_built_from_headcounts(client, admin):
     r = client.post("/admin/groups/build", headers=admin).json()
     assert len(r["rebuilt"]) == 8
     levels = r["levels"]
-    l1 = next(x for x in levels if x["level"] == "L1 CS")
+    l1 = next(x for x in levels if x["level"] == "L1 INFO")
     section = l1["sections"][0]
     assert section["size"] == 160
     tds = section["td"]
@@ -50,7 +50,7 @@ def test_tp_subgroups_when_the_department_splits(client, admin):
     assert r.status_code == 200 and r.json()["changed"] == ["split_tp_groups"]
     assert client.put("/admin/settings", headers=admin, json={"split_tp_groups": "yes"}).status_code == 422
     levels = client.post("/admin/groups/build", headers=admin).json()["levels"]
-    tds = next(x for x in levels if x["level"] == "L1 CS")["sections"][0]["td"]
+    tds = next(x for x in levels if x["level"] == "L1 INFO")["sections"][0]["td"]
     assert all(len(t["tp"]) == 2 for t in tds)                            # 2 TP subgroups each
     assert all(sum(tp["size"] for tp in t["tp"]) == t["size"] for t in tds)
     # The demo professors were sized for unsplit groups: some TP can't be staffed, and the

@@ -8,7 +8,7 @@ Two pieces of AI, both running on the server itself (no internet, no GPU).
 plain lists: days and time slots, open rooms, groups (section → TD groups → TP subgroups),
 professors (weekly maximum, "can't" slots, "rather not" slots), who can teach what (module,
 lecture/TD/TP, wish-list rank), and one **requirement** per weekly session to place
-(e.g. "Algorithms 1, TD, group L1 CS - G3", twice if it is twice a week). It also passes the
+(e.g. "Algorithms 1, TD, group L1 INFO - G3", twice if it is twice a week). It also passes the
 current timetable, so a re-solve can keep sessions where they are.
 
 **The model.** For every requirement the solver has yes/no choices:

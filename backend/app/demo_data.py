@@ -25,10 +25,10 @@ from .rules import Rules, get_rules
 from .services.catalog import create_professor
 
 LEVELS = {
-    "L1 CS": (160, {
+    "L1 INFO": (160, {
         "Algorithms 1": (2, 2, 1), "Calculus 1": (2, 2, 0), "Linear Algebra 1": (1, 2, 0),
         "Computer Structure": (1, 1, 1), "Terminology": (1, 0, 0), "English 1": (0, 1, 0)}),
-    "L2 CS": (120, {
+    "L2 INFO": (120, {
         "Algorithms & Data Structures": (2, 1, 1), "Computer Architecture": (1, 1, 1),
         "Information Systems": (1, 1, 0), "Formal Languages": (1, 1, 0),
         "Probability": (1, 1, 0), "Object-Oriented Programming": (1, 0, 1)}),
@@ -43,10 +43,10 @@ LEVELS = {
         "Optimization": (1, 1, 0), "Natural Language Processing": (1, 0, 1)}),
     "M2 AI": (30, {
         "Deep Learning": (1, 0, 1), "Project Methodology": (0, 1, 0), "AI Ethics": (1, 0, 0)}),
-    "M1 SEC": (35, {
+    "M1 CS": (35, {
         "Applied Cryptography": (1, 1, 1), "Network Security": (1, 1, 1),
         "Secure Software Development": (1, 0, 1), "Security Auditing & Standards": (1, 1, 0)}),
-    "M2 SEC": (28, {
+    "M2 CS": (28, {
         "Penetration Testing": (1, 0, 1), "Digital Forensics": (1, 0, 1),
         "Cloud & IoT Security": (1, 1, 0), "Research Methodology": (0, 1, 0)}),
 }
