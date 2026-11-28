@@ -100,7 +100,7 @@ export function GroupWeek() {
   const { id } = useParams()
   const cfg = useConfig()
   const [params, setParams] = useSearchParams()
-  const date = params.get('date') || cfg.data?.display_date || ''
+  const date = params.get('date') || cfg.data?.display_date || cfg.data?.today || ''
   const week = useLoad<Week>(date ? `/public/groups/${id}/week?date=${date}` : null)
   const groups = useLoad<LevelGroups[]>('/public/groups')
   const [share, setShare] = useState(false)
@@ -127,7 +127,7 @@ export function GroupWeek() {
       </PageHead>
       <SavedCopyNote savedAt={week.savedAt} />
       <div className="row-between">
-        <WeekNav week={week.data} date={date} thisWeek={cfg.data?.display_date ?? ''} onChange={(d) => setParams({ date: d })} />
+        <WeekNav week={week.data} date={date} thisWeek={cfg.data?.display_date ?? cfg.data?.today ?? ''} onChange={(d) => setParams({ date: d })} />
         {changes.length > 0 && (
           <span className="small muted">
             {changes.filter((c) => c.status === 'cancelled').length} cancelled ·{' '}

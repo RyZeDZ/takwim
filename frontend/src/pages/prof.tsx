@@ -13,7 +13,7 @@ export function ProfWeek() {
   const cfg = useConfig()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
-  const date = params.get('date') || cfg.data?.display_date || ''
+  const date = params.get('date') || cfg.data?.display_date || cfg.data?.today || ''
   const week = useLoad<Week>(date ? `/me/week?date=${date}` : null)
   const absences = useLoad<Absence[]>('/me/absences')
   const [picked, setPicked] = useState<WeekEntry | null>(null)
@@ -74,7 +74,7 @@ export function ProfWeek() {
         </Link>
       </PageHead>
       <SavedCopyNote savedAt={week.savedAt} />
-      <WeekNav week={week.data} date={date} thisWeek={cfg.data?.display_date ?? ''} onChange={(d) => setParams({ date: d })} />
+      <WeekNav week={week.data} date={date} thisWeek={cfg.data?.display_date ?? cfg.data?.today ?? ''} onChange={(d) => setParams({ date: d })} />
       {week.error && <ErrorBox error={week.error} onRetry={week.reload} />}
       {week.loading && !week.data && <Loading />}
       {week.data && week.data.entries.length === 0 && (

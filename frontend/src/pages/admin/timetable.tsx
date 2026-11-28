@@ -217,7 +217,7 @@ export function Timetable() {
   const [params, setParams] = useSearchParams()
   const scope = (params.get('scope') as Scope) || 'group'
   const id = params.get('id') || ''
-  const date = params.get('date') || cfg.data?.display_date || ''
+  const date = params.get('date') || cfg.data?.display_date || cfg.data?.today || ''
   const groups = useLoad<LevelGroups[]>('/public/groups')
   const profs = useLoad<Professor[]>('/admin/professors')
   const rooms = useLoad<Room[]>('/admin/rooms')
@@ -290,7 +290,7 @@ export function Timetable() {
                 </option>
               ))}
             </select>
-            <WeekNav week={week.data} date={date} thisWeek={cfg.data?.display_date ?? ''} onChange={(d) => set({ date: d })} />
+            <WeekNav week={week.data} date={date} thisWeek={cfg.data?.display_date ?? cfg.data?.today ?? ''} onChange={(d) => set({ date: d })} />
           </div>
           {id && (
             <div className="row">
