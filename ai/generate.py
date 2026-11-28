@@ -1,5 +1,5 @@
 """
-Takwim - synthetic department generator (Person 2).
+Synthetic department generator.
 
 Creates a fake but realistic computer-science department:
     L1, L2            common core (Informatique)

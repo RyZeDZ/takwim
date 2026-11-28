@@ -246,6 +246,7 @@ def generate(db: DB) -> dict:
                     previous[a["requirement_id"]][k] != a[k] for k in ("prof_id", "room_id", "day", "slot")))
     summary = {
         "solver": solver_name,
+        "solver_stats": result.get("stats"),
         "warning": warning,
         "seconds": seconds,
         "groups_rebuilt_for": rebuilt,

@@ -80,3 +80,20 @@ def test_column_mapper_plugin(client, admin, monkeypatch):
     p = client.post("/admin/import/preview", headers=admin, data={"kind": "rooms"},
                     files={"file": ("r.csv", "Room,Seats (approx.)\nRoom 1,40\n".encode())}).json()
     assert p["mapping"]["capacity"]["method"] == "llm" and p["rows"][0]["capacity"] == 40
+
+
+def test_cpsat_solver_from_ai_folder(client, admin, monkeypatch):
+    """The real AI solver (ai/solver.py): valid timetable, then a room closes and it re-solves."""
+    import pytest
+
+    pytest.importorskip("ortools")
+    monkeypatch.setenv("SOLVER_MODULE", "ai.solver")
+    monkeypatch.setenv("SOLVER_TIME_LIMIT", "3")
+    client.post("/admin/demo/seed", headers=admin)
+    r = client.post("/admin/timetable/generate", headers=admin).json()
+    assert r["solver"] == "ai.solver" and r["warning"] is None
+    assert r["saved"] and r["conflicts"] == [] and r["unscheduled"] == []
+    room = next(x for x in client.get("/admin/rooms", headers=admin).json() if x["type"] == "td")
+    client.patch(f"/admin/rooms/{room['id']}", json={"active": False}, headers=admin)
+    again = client.post("/admin/timetable/generate", headers=admin).json()
+    assert again["saved"] and again["conflicts"] == [] and again["solver"] == "ai.solver"

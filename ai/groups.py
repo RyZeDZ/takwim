@@ -1,5 +1,5 @@
 """
-Takwim - group builder (Person 2).
+Group builder.
 
 Turns level headcounts into sections and groups, and lists the sessions
 each group must have per week. No student names are used, only headcounts.
