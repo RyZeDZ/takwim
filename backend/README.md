@@ -19,7 +19,7 @@ The database file and the admin account are created automatically on first start
 ## Test it
 
 ```bash
-pytest -q                       # about 40 tests, ~30 s
+pytest -q                       # 45 tests, ~30 s
 python scripts/demo_cases.py    # runs 3 demo scenarios on a temporary database
 ```
 

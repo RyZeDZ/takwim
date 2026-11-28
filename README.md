@@ -44,7 +44,7 @@ Laptop: AMD Ryzen 7 6800H, 16 GB RAM; the solver uses 4 CPU threads.
 | --- | --- | --- |
 | Sessions placed | 172 / 172 | 172 / 172 |
 | Clashes | 0 | 0 |
-| Empty slots between classes, per group per week | 0.67 | **0.28** (−58 %) |
+| Empty slots between classes, per group per week | 0.67 | **0.28 to 0.44** (−35 to −58 %, over several runs) |
 | Sessions moved when a busy room closes | only the ones in that room | only the ones in that room |
 | Time to generate | 0.02 s | 10 s (time limit, adjustable) |
 
