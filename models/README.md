@@ -14,3 +14,6 @@ pip install llama-cpp-python   # in the backend's virtual environment
 
 Then set `COLUMN_MAPPER_MODULE=ai.column_mapper` in `backend/.env`. Without the model, imports
 still work with the dictionary alone.
+
+On a server started with `python backend/serve.py`, the model is downloaded automatically on
+the first start when `COLUMN_MAPPER_MODULE` is set and the file is missing.
