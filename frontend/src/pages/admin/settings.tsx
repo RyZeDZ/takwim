@@ -171,7 +171,7 @@ export function Settings() {
 
       <section className="panel stack-sm">
         <h2>Limits and group sizes</h2>
-        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', alignItems: 'start' }}>
           {NUMBERS.map((n) => (
             <label key={n.key} className="field">
               {n.label}

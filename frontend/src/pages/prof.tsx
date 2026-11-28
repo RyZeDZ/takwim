@@ -18,10 +18,12 @@ export function ProfWeek() {
   const absences = useLoad<Absence[]>('/me/absences')
   const [picked, setPicked] = useState<WeekEntry | null>(null)
   const [busy, setBusy] = useState(false)
+  const { reload: reloadWeek } = week
+  const { reload: reloadAbsences } = absences
   const refresh = useCallback(() => {
-    week.reload()
-    absences.reload()
-  }, [week.reload, absences.reload])
+    reloadWeek()
+    reloadAbsences()
+  }, [reloadWeek, reloadAbsences])
   useOnDataChanged(refresh)
   const today = cfg.data?.today ?? ''
 
@@ -478,10 +480,12 @@ export function ProfBookings() {
   const absences = useLoad<Absence[]>('/me/absences')
   const claims = useLoad<Claim[]>('/me/claims')
   const cfg = useConfig()
+  const { reload: reloadAbsences } = absences
+  const { reload: reloadClaims } = claims
   const refresh = useCallback(() => {
-    absences.reload()
-    claims.reload()
-  }, [absences.reload, claims.reload])
+    reloadAbsences()
+    reloadClaims()
+  }, [reloadAbsences, reloadClaims])
   useOnDataChanged(refresh)
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
