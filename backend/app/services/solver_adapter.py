@@ -222,6 +222,65 @@ def gaps_per_group(data: dict, assignments: list[dict]) -> float:
     return round(total / len(leaves), 2)
 
 
+def explain_unscheduled(data: dict, assignments: list[dict], req: dict) -> dict:
+    """A concrete fix for a session that could not be placed, as a code + details (the web app
+    words it in the user's language)."""
+    profs = {p["id"]: p for p in data["professors"]}
+    cands = sorted({t["prof_id"] for t in data["can_teach"]
+                    if t["module_id"] == req["module_id"] and req["kind"] in t["kinds"]
+                    and t["prof_id"] in profs and profs[t["prof_id"]].get("max_sessions", 1) > 0})
+    if not cands:
+        return {"code": "no_teacher"}
+    types = data["room_types_for"].get(req["kind"], [])
+    of_type = [r for r in data["rooms"] if r["type"] in types]
+    if not of_type:
+        return {"code": "no_room_type", "types": types}
+    if not any(r["capacity"] >= req["size"] for r in of_type):
+        return {"code": "room_too_small", "types": types, "size": req["size"],
+                "biggest": max(r["capacity"] for r in of_type)}
+    load = defaultdict(int)
+    for a in assignments:
+        load[a["prof_id"]] += 1
+    if all(load[p] >= profs[p].get("max_sessions", 0) for p in cands):
+        return {"code": "profs_full", "professors": [profs[p]["name"] for p in cands]}
+    return {"code": "no_common_time", "professors": [profs[p]["name"] for p in cands]}
+
+
+def describe_changes(db: DB, data: dict, assignments: list[dict]) -> list[dict]:
+    """Every session that moved compared with the previous timetable: from where, to where, why."""
+    previous = {p["requirement_id"]: p for p in data["previous"]}
+    reqs = {r["id"]: r for r in data["requirements"]}
+    open_rooms = {r["id"] for r in data["rooms"]}
+    room_name = {r.id: r.name for r in db.scalars(select(Room))}
+    prof_name = {p["id"]: p["name"] for p in data["professors"]}
+    group_name = {g["id"]: g["name"] for g in data["groups"]}
+    unavailable = {(p["id"], d, s) for p in data["professors"] for d, s in p.get("unavailable", [])}
+    n_days, n_slots = len(data["days"]), len(data["slots"])
+
+    def place(a):
+        return {"day": a["day"], "slot": a["slot"], "room": room_name.get(a["room_id"], "?"),
+                "professor": prof_name.get(a["prof_id"], "?")}
+
+    out = []
+    for a in assignments:
+        old = previous.get(a["requirement_id"])
+        if not old or all(old[k] == a[k] for k in ("prof_id", "room_id", "day", "slot")):
+            continue
+        if old["room_id"] not in open_rooms:
+            reason = "room_closed"
+        elif old["day"] >= n_days or old["slot"] >= n_slots:
+            reason = "slot_removed"
+        elif (old["prof_id"], old["day"], old["slot"]) in unavailable:
+            reason = "prof_unavailable"
+        else:
+            reason = "knock_on"  # moved to make room for the changes above
+        r = reqs[a["requirement_id"]]
+        out.append({"module": r["module"], "kind": r["kind"], "group": group_name.get(r["group_id"], "?"),
+                    "from": place(old), "to": place(a), "reason": reason})
+    order = {"room_closed": 0, "slot_removed": 1, "prof_unavailable": 2, "knock_on": 3}
+    return sorted(out, key=lambda c: (order[c["reason"]], c["group"], c["module"]))
+
+
 def generate(db: DB) -> dict:
     """Rebuild changed groups, solve, re-check, save. Keeps upcoming absences when possible."""
     rebuilt = [lv["level"] for lv in build_groups(db, only_changed=True)]
@@ -257,8 +316,10 @@ def generate(db: DB) -> dict:
         "unscheduled": [
             {**u, "module": reqs[u["requirement_id"]]["module"],
              "group": group_names[reqs[u["requirement_id"]]["group_id"]],
-             "kind": reqs[u["requirement_id"]]["kind"]}
+             "kind": reqs[u["requirement_id"]]["kind"],
+             "fix": explain_unscheduled(data, assignments, reqs[u["requirement_id"]])}
             for u in result.get("unscheduled", []) if u.get("requirement_id") in reqs],
+        "changes": [] if conflicts else describe_changes(db, data, assignments),
         "conflicts": conflicts,
         "sessions_moved": moved if previous else None,
         "gaps_per_group_per_week": None if conflicts else gaps_per_group(data, assignments),

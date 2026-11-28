@@ -80,3 +80,25 @@ def test_manual_move(client, admin, demo):
     assert client.patch("/admin/sessions/999999", headers=admin, json={"day": 1}).status_code == 404
     assert client.patch(f"/admin/sessions/{a.id}", headers=admin, json={"room_id": 999999}).status_code == 404
     assert client.patch(f"/admin/sessions/{a.id}", headers=admin, json={"day": 7}).status_code == 422
+
+
+def test_changes_explain_why_sessions_moved(client, admin, demo):
+    first = client.post("/admin/timetable/generate", headers=admin).json()
+    assert first["changes"] == []  # nothing to compare with yet
+    again = client.post("/admin/timetable/generate", headers=admin).json()
+    assert again["changes"] == []  # no change, nothing moves
+    room = next(r for r in client.get("/admin/rooms", headers=admin).json() if r["type"] == "td")
+    client.patch(f"/admin/rooms/{room['id']}", json={"active": False}, headers=admin)
+    r = client.post("/admin/timetable/generate", headers=admin).json()
+    closed = [c for c in r["changes"] if c["reason"] == "room_closed"]
+    assert closed and all(c["from"]["room"] == room["name"] != c["to"]["room"] for c in closed)
+    assert len(r["changes"]) == r["sessions_moved"]
+
+
+def test_unplaced_sessions_come_with_a_fix(client, admin, demo):
+    for lab in [x for x in client.get("/admin/rooms", headers=admin).json() if x["type"] == "lab"]:
+        client.patch(f"/admin/rooms/{lab['id']}", json={"capacity": 10}, headers=admin)
+    r = client.post("/admin/timetable/generate", headers=admin).json()
+    tps = [u for u in r["unscheduled"] if u["kind"] == "tp"]
+    assert tps and tps[0]["fix"]["code"] == "room_too_small"
+    assert tps[0]["fix"]["biggest"] == 10 and tps[0]["fix"]["size"] > 10
