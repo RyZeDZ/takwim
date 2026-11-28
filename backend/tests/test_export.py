@@ -7,7 +7,7 @@ def test_exports(client, admin, demo):
     r = client.get("/export/excel")
     assert r.status_code == 200
     wb = load_workbook(BytesIO(r.content))
-    assert len(wb.sheetnames) > 20  # one sheet per student group
+    assert len(wb.sheetnames) > 15  # one sheet per student group
     first = wb.worksheets[0]
     assert first["A3"].value == "Sunday" and first["B2"].value == "08:00-09:30"
     assert any(c.value for row in first.iter_rows(min_row=3) for c in row[1:])

@@ -180,7 +180,7 @@ def test_public_endpoints(client, demo):
     assert cfg["days"][0] == "Sunday" and len(cfg["slots"]) == 6
     assert client.get("/public/groups/999999/week").status_code == 404
     assert client.get("/public/free-rooms?date=2030-01-06&slot=9").status_code == 422
-    leaf = client.get("/public/groups").json()[0]["sections"][0]["children"][0]["children"][0]
+    leaf = client.get("/public/groups").json()[0]["sections"][0]["children"][0]
     week = client.get(f"/public/groups/{leaf['id']}/week").json()
     kinds = {e["kind"] for e in week["entries"]}
     assert {"lecture", "td", "tp"} <= kinds  # a TP subgroup sees lectures, TD and its own TP

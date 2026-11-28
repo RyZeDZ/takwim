@@ -49,7 +49,9 @@ class Rules:
     section_max_size: int = 180
     td_group_size: int = 30
     tp_group_size: int = 15
+    split_tp_groups: bool = False  # off: the TD group does the TP together
     default_max_sessions_per_professor: int = 12
+    max_sessions_per_day_per_professor: int = 4
     room_types_for: dict[str, list[str]] = field(
         default_factory=lambda: {
             "lecture": ["amphi", "td"],
@@ -147,6 +149,7 @@ def validate(data: dict) -> list[str]:
         "td_group_size",
         "tp_group_size",
         "default_max_sessions_per_professor",
+        "max_sessions_per_day_per_professor",
     ):
         if not isinstance(data[key], int) or data[key] < 1:
             errors.append(f"{key} must be a whole number >= 1")
