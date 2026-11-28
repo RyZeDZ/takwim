@@ -8,11 +8,14 @@ CONTRACT: solve(data) -> result, plain dicts only.
 data = {
   "days":  ["Sunday", ...],                "slots": ["08:00-09:30", ...],
   "room_types_for": {"lecture": ["amphi", "td"], "td": ["td"], "tp": ["lab"]},
-  "options": {"max_sessions_per_day_group": 4},
+  "options": {"max_sessions_per_day_group": 4, "max_sessions_per_day_prof": 4},
   "rooms":      [{"id", "name", "type", "capacity"}],           # open rooms only
   "groups":     [{"id", "name", "kind", "size", "parent_id"}],  # TP ⊂ TD ⊂ section
-  "professors": [{"id", "name", "max_sessions", "unavailable": [[day, slot], ...]}],
-  "can_teach":  [{"prof_id", "module_id", "kinds": ["lecture", "td", "tp"]}],
+  "professors": [{"id", "name", "max_sessions",                 # max sessions per week
+                  "unavailable": [[day, slot], ...],            # hard: never there
+                  "avoid": [[day, slot], ...]}],                # soft: avoid when possible
+  "can_teach":  [{"prof_id", "module_id", "kinds": ["lecture", "td", "tp"],
+                  "rank"}],                                     # 1 = first choice (soft)
   "requirements": [{"id", "module_id", "module", "group_id", "kind", "size"}],
       # one entry per weekly session that must be placed
   "previous": [{"requirement_id", "prof_id", "room_id", "day", "slot"}],
@@ -76,25 +79,26 @@ def build_input(db: DB) -> dict:
             else:
                 add(m, g, "tp", m.tp_per_week)
 
-    unavail = defaultdict(list)
-    for u in db.scalars(select(Unavailability)):
+    unavail, avoid = defaultdict(list), defaultdict(list)
+    for u in db.scalars(select(Unavailability).order_by(Unavailability.id)):
         if u.day < rules.n_days and u.slot < rules.n_slots:
-            unavail[u.professor_id].append([u.day, u.slot])
+            (avoid if u.soft else unavail)[u.professor_id].append([u.day, u.slot])
 
     data = {
         "days": rules.day_names,
         "slots": rules.time_slots,
         "room_types_for": rules.room_types_for,
-        "options": {"max_sessions_per_day_group": rules.max_sessions_per_day_per_group},
+        "options": {"max_sessions_per_day_group": rules.max_sessions_per_day_per_group,
+                    "max_sessions_per_day_prof": rules.max_sessions_per_day_per_professor},
         "rooms": [{"id": r.id, "name": r.name, "type": r.type, "capacity": r.capacity}
                   for r in db.scalars(select(Room).where(Room.active.is_(True)).order_by(Room.id))],
         "groups": [{"id": g.id, "name": g.name, "kind": g.kind, "size": g.size,
                     "parent_id": g.parent_id} for g in groups],
         "professors": [{"id": p.id, "name": p.name, "max_sessions": p.max_sessions,
-                        "unavailable": unavail[p.id]}
+                        "unavailable": unavail[p.id], "avoid": avoid[p.id]}
                        for p in db.scalars(select(Professor).order_by(Professor.id))],
         "can_teach": [{"prof_id": t.professor_id, "module_id": t.module_id,
-                       "kinds": [k for k in t.kinds.split(",") if k]}
+                       "kinds": [k for k in t.kinds.split(",") if k], "rank": t.rank or 1}
                       for t in db.scalars(select(Teaching))],
         "requirements": requirements,
         "previous": [],
@@ -138,6 +142,8 @@ def find_conflicts(data: dict, assignments: list[dict]) -> list[str]:
     problems = []
     prof_at, room_at, group_at = {}, {}, defaultdict(list)
     load = defaultdict(int)
+    load_day = defaultdict(int)
+    max_prof_day = data.get("options", {}).get("max_sessions_per_day_prof")
     seen = set()
 
     def label(r):
@@ -176,6 +182,7 @@ def find_conflicts(data: dict, assignments: list[dict]) -> list[str]:
         room_at[(rid, d, s)] = label(r)
         group_at[(d, s)].append((r["group_id"], label(r)))
         load[pid] += 1
+        load_day[(pid, d)] += 1
     for (d, s), items in group_at.items():
         for i, (g1, l1) in enumerate(items):
             rel = tree.related(g1)
@@ -185,6 +192,11 @@ def find_conflicts(data: dict, assignments: list[dict]) -> list[str]:
     for pid, n in load.items():
         if pid in profs and n > profs[pid]["max_sessions"]:
             problems.append(f"{profs[pid]['name']} over their maximum load ({n} sessions)")
+    if max_prof_day:
+        for (pid, d), n in load_day.items():
+            if n > max_prof_day and pid in profs:
+                problems.append(f"{profs[pid]['name']} has {n} sessions on {data['days'][d]} "
+                                f"(maximum {max_prof_day} per day)")
     return problems
 
 

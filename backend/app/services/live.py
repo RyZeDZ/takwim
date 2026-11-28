@@ -61,7 +61,8 @@ def slot_problems(db: DB, rules: Rules, occ: Occupancy, tree: GroupTree, prof_id
         return problems
     if db.scalar(select(Unavailability).where(Unavailability.professor_id == prof_id,
                                               Unavailability.day == di,
-                                              Unavailability.slot == slot)):
+                                              Unavailability.slot == slot,
+                                              Unavailability.soft.is_(False))):
         problems.append("you marked this slot as unavailable")
     if (prof_id, slot) in occ.prof:
         problems.append(f"you already teach then: {occ.prof[(prof_id, slot)]}")

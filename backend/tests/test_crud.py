@@ -34,7 +34,7 @@ def test_professor_accounts(client, admin):
         "name": "Amel Kaci", "max_sessions": 10,
         "teaches": [{"module_id": mod["id"], "kinds": ["lecture", "td"]}]}).json()
     assert p["username"] == "amel.kaci" and p["password"]
-    assert p["teaches"] == [{"module_id": mod["id"], "kinds": ["lecture", "td"]}]
+    assert p["teaches"] == [{"module_id": mod["id"], "kinds": ["lecture", "td"], "rank": 1}]
     assert client.post("/admin/professors", headers=admin, json={"name": "Amel Kaci"}).status_code == 409
     prof = login_prof(client, p)
     assert client.get("/admin/rooms", headers=prof).status_code == 403  # profs aren't admins

@@ -19,7 +19,13 @@ from ..schemas import (
     RoomOut,
     RoomPatch,
 )
-from ..services.catalog import create_professor, professor_view, save_availability, set_teaching
+from ..services.catalog import (
+    availability_view,
+    create_professor,
+    professor_view,
+    save_availability,
+    set_teaching,
+)
 from .common import commit_or_409, get_or_404
 
 router = APIRouter(prefix="/admin", tags=["admin: data"], dependencies=[Depends(require_admin)])
@@ -132,7 +138,7 @@ def add_professor(body: ProfessorIn, db: DB = Depends(get_db)):
     p, _, password = create_professor(db, body.name, body.max_sessions)
     for t in body.teaches:
         get_or_404(db, Module, t.module_id)
-        set_teaching(db, p.id, t.module_id, t.kinds)
+        set_teaching(db, p.id, t.module_id, t.kinds, t.rank)
     db.commit()
     return {**professor_view(db, p), "password": password}
 
@@ -146,7 +152,7 @@ def update_professor(prof_id: int, body: ProfessorIn, db: DB = Depends(get_db)):
     db.execute(delete(Teaching).where(Teaching.professor_id == p.id))
     for t in body.teaches:
         get_or_404(db, Module, t.module_id)
-        set_teaching(db, p.id, t.module_id, t.kinds)
+        set_teaching(db, p.id, t.module_id, t.kinds, t.rank)
     commit_or_409(db)
     return professor_view(db, p)
 
@@ -172,8 +178,7 @@ def reset_password(prof_id: int, db: DB = Depends(get_db)):
 @router.get("/professors/{prof_id}/availability", response_model=AvailabilityIn)
 def get_prof_availability(prof_id: int, db: DB = Depends(get_db)):
     get_or_404(db, Professor, prof_id)
-    rows = db.scalars(select(Unavailability).where(Unavailability.professor_id == prof_id))
-    return {"unavailable": [{"day": u.day, "slot": u.slot} for u in rows]}
+    return availability_view(db, prof_id)
 
 
 @router.put("/professors/{prof_id}/availability", response_model=AvailabilityIn)

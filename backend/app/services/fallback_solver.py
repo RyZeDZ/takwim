@@ -35,14 +35,18 @@ def _related_sets(groups: list[dict]) -> dict[int, set[int]]:
 def solve(data: dict) -> dict:
     n_days, n_slots = len(data["days"]), len(data["slots"])
     max_per_day = data.get("options", {}).get("max_sessions_per_day_group", 4)
+    max_prof_day = data.get("options", {}).get("max_sessions_per_day_prof", 99)
     room_types_for = data["room_types_for"]
     related = _related_sets(data["groups"])
     rooms = data["rooms"]
     profs = {p["id"]: p for p in data["professors"]}
     unavailable = {(p["id"], d, s) for p in data["professors"] for d, s in p.get("unavailable", [])}
+    avoid = {(p["id"], d, s) for p in data["professors"] for d, s in p.get("avoid", [])}
 
     teachers = defaultdict(list)  # (module_id, kind) -> [prof_id]
+    rank = {}  # (prof_id, module_id) -> 1 = first choice
     for t in data["can_teach"]:
+        rank[(t["prof_id"], t["module_id"])] = t.get("rank", 1)
         for k in t["kinds"]:
             teachers[(t["module_id"], k)].append(t["prof_id"])
 
@@ -62,6 +66,7 @@ def solve(data: dict) -> dict:
         other = table.get(key)
         return other is not None and other != rid and other not in placed_ids
     load = defaultdict(int)
+    load_day = defaultdict(int)  # (prof_id, day) -> sessions
     prof_busy, room_busy = set(), set()
     group_slots = defaultdict(set)  # (group_id, day) -> {slots}
     module_days = defaultdict(lambda: defaultdict(int))  # (module, group, kind) -> {day: n}
@@ -92,6 +97,8 @@ def solve(data: dict) -> dict:
             for s in range(n_slots):
                 if (pid, d, s) in prof_busy or (pid, d, s) in unavailable:
                     continue
+                if load_day[(pid, d)] >= max_prof_day:
+                    continue
                 if any(s in group_slots[(rg, d)] for rg in related[gid]):
                     continue
                 room, room_cost = None, None
@@ -117,6 +124,7 @@ def solve(data: dict) -> dict:
                     + (30 if module_days[(req["module_id"], gid, kind)][d] > 0 else 0)
                     + room_cost
                     + s
+                    + (25 if (pid, d, s) in avoid else 0)
                     - (8 if adjacent else 0)
                     - (40 if prev and (prev["day"], prev["slot"]) == (d, s) else 0)
                     + (30 if held_by_other(held_prof, (pid, d, s), req["id"]) else 0)
@@ -135,6 +143,7 @@ def solve(data: dict) -> dict:
         group_slots[(req["group_id"], d)].add(s)
         module_days[(req["module_id"], req["group_id"], req["kind"])][d] += 1
         load[pid] += 1
+        load_day[(pid, d)] += 1
 
     def unplace(req, pid, d, s, rid):
         placed_ids.discard(req["id"])
@@ -143,12 +152,13 @@ def solve(data: dict) -> dict:
         group_slots[(req["group_id"], d)].discard(s)
         module_days[(req["module_id"], req["group_id"], req["kind"])][d] -= 1
         load[pid] -= 1
+        load_day[(pid, d)] -= 1
 
     assignments, unscheduled = [], []
     for (module_id, kind, gid), reqs in order:
         prev_profs = {previous[r["id"]]["prof_id"] for r in reqs if r["id"] in previous}
         candidates = sorted(set(teachers[(module_id, kind)]),
-                            key=lambda p: (p not in prev_profs,
+                            key=lambda p: (p not in prev_profs, rank.get((p, module_id), 1),
                                            load[p] / max(1, profs[p].get("max_sessions", 12))))
         if not candidates:
             for r in reqs:

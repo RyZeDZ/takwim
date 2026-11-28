@@ -10,8 +10,10 @@ from ..rules import get_rules
 
 def professor_view(db: DB, p: Professor) -> dict:
     user = db.scalar(select(User).where(User.professor_id == p.id))
-    teaches = [{"module_id": t.module_id, "kinds": [k for k in t.kinds.split(",") if k]}
-               for t in db.scalars(select(Teaching).where(Teaching.professor_id == p.id))]
+    teaches = [{"module_id": t.module_id, "kinds": [k for k in t.kinds.split(",") if k],
+                "rank": t.rank or 1}
+               for t in db.scalars(select(Teaching).where(Teaching.professor_id == p.id)
+                                   .order_by(Teaching.rank, Teaching.id))]
     filled = db.scalar(select(func.count()).select_from(Unavailability)
                        .where(Unavailability.professor_id == p.id)) > 0
     return {"id": p.id, "name": p.name, "max_sessions": p.max_sessions,
@@ -33,14 +35,14 @@ def create_professor(db: DB, name: str, max_sessions: int | None = None) -> tupl
     return p, username, password
 
 
-def set_teaching(db: DB, prof_id: int, module_id: int, kinds: list[str]) -> None:
+def set_teaching(db: DB, prof_id: int, module_id: int, kinds: list[str], rank: int = 1) -> None:
     t = db.scalar(select(Teaching).where(Teaching.professor_id == prof_id,
                                          Teaching.module_id == module_id))
     value = ",".join(dict.fromkeys(kinds)) or "lecture,td,tp"
     if t:
-        t.kinds = value
+        t.kinds, t.rank = value, rank
     else:
-        db.add(Teaching(professor_id=prof_id, module_id=module_id, kinds=value))
+        db.add(Teaching(professor_id=prof_id, module_id=module_id, kinds=value, rank=rank))
 
 
 def commit_rows(db: DB, kind: str, rows: list[dict]) -> dict:
@@ -106,14 +108,15 @@ def commit_rows(db: DB, kind: str, rows: list[dict]) -> dict:
                 credentials.append({"name": name, "username": username, "password": password})
                 created += 1
             kinds = [k for k in str(row.get("kinds") or "lecture,td,tp").split(",") if k]
-            for mod_name in row.get("modules") or []:
+            # The wish list is in order of preference: first module = first choice.
+            for rank, mod_name in enumerate(row.get("modules") or [], start=1):
                 mods = list(db.scalars(select(Module).where(
                     func.lower(Module.name) == mod_name.strip().lower())))
                 if not mods:
                     warnings.append(f"row {n}: module '{mod_name}' not found for {name} "
                                     f"(import modules first)")
                 for m in mods:
-                    set_teaching(db, p.id, m.id, kinds)
+                    set_teaching(db, p.id, m.id, kinds, rank)
         db.flush()
     db.commit()
     return {"created": created, "updated": updated, "skipped": skipped,
@@ -121,14 +124,24 @@ def commit_rows(db: DB, kind: str, rows: list[dict]) -> dict:
 
 
 def save_availability(db: DB, prof_id: int, body) -> dict:
-    """Replace a professor's grid of 'I can't' slots."""
+    """Replace a professor's grid: 'I can't' slots and 'I'd rather not' slots."""
     rules = get_rules(db)
-    for ref in body.unavailable:
+    for ref in [*body.unavailable, *body.avoid]:
         if ref.day >= rules.n_days or ref.slot >= rules.n_slots:
             raise HTTPException(422, f"day/slot out of range: {ref.day}/{ref.slot}")
     db.execute(delete(Unavailability).where(Unavailability.professor_id == prof_id))
-    unique = {(r.day, r.slot) for r in body.unavailable}
-    for d, s in sorted(unique):
-        db.add(Unavailability(professor_id=prof_id, day=d, slot=s))
+    hard = {(r.day, r.slot) for r in body.unavailable}
+    soft = {(r.day, r.slot) for r in body.avoid} - hard  # "can't" wins over "rather not"
+    for d, s in sorted(hard):
+        db.add(Unavailability(professor_id=prof_id, day=d, slot=s, soft=False))
+    for d, s in sorted(soft):
+        db.add(Unavailability(professor_id=prof_id, day=d, slot=s, soft=True))
     db.commit()
-    return {"unavailable": [{"day": d, "slot": s} for d, s in sorted(unique)]}
+    return availability_view(db, prof_id)
+
+
+def availability_view(db: DB, prof_id: int) -> dict:
+    rows = list(db.scalars(select(Unavailability).where(Unavailability.professor_id == prof_id)
+                           .order_by(Unavailability.day, Unavailability.slot)))
+    return {"unavailable": [{"day": u.day, "slot": u.slot} for u in rows if not u.soft],
+            "avoid": [{"day": u.day, "slot": u.slot} for u in rows if u.soft]}

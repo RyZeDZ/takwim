@@ -106,6 +106,8 @@ class Teaching(Base):
     )
     module_id: Mapped[int] = mapped_column(ForeignKey("modules.id", ondelete="CASCADE"))
     kinds: Mapped[str] = mapped_column(String(30), default="lecture,td,tp")
+    # Order of preference from the professor's wish list (fiche de voeux): 1 = first choice.
+    rank: Mapped[int] = mapped_column(Integer, default=1)
 
 
 class Room(Base):
@@ -120,7 +122,8 @@ class Room(Base):
 
 
 class Unavailability(Base):
-    """A slot a professor tapped as 'I can't' on the weekly grid."""
+    """A slot a professor tapped on the weekly grid: 'I can't' (hard rule) or, with soft=True,
+    'I'd rather not' (the solver avoids it when it can)."""
 
     __tablename__ = "unavailabilities"
     __table_args__ = (UniqueConstraint("professor_id", "day", "slot"),)
@@ -130,6 +133,7 @@ class Unavailability(Base):
     )
     day: Mapped[int] = mapped_column(Integer)
     slot: Mapped[int] = mapped_column(Integer)
+    soft: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Session(Base):

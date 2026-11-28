@@ -135,10 +135,23 @@ def seed_demo(db: DB) -> dict:
             remaining -= take
     for idx, pairs in teach.items():
         by_module = defaultdict(list)
-        for mid, kind in pairs:
+        for mid, kind in sorted(pairs):
             by_module[mid].append(kind)
-        for mid, kinds in by_module.items():
-            db.add(Teaching(professor_id=profs[idx].id, module_id=mid, kinds=",".join(kinds)))
+        # Wish-list order: the module with the most sessions first.
+        ordered = sorted(by_module, key=lambda mid: -len(by_module[mid]))
+        for rank, mid in enumerate(ordered, start=1):
+            db.add(Teaching(professor_id=profs[idx].id, module_id=mid,
+                            kinds=",".join(by_module[mid]), rank=rank))
+    # A few realistic constraints: some professors can't teach on Thursday afternoon,
+    # others would rather not start at 8:00.
+    n_slots, n_days = rules.n_slots, rules.n_days
+    for idx, p in enumerate(profs):
+        if idx % 4 == 1 and n_days >= 1 and n_slots >= 2:
+            for slot in (n_slots - 2, n_slots - 1):
+                db.add(Unavailability(professor_id=p.id, day=n_days - 1, slot=slot))
+        if idx % 3 == 2:
+            for day in range(n_days):
+                db.add(Unavailability(professor_id=p.id, day=day, slot=0, soft=True))
     db.commit()
     return {"levels": len(LEVELS), "rooms": len(ROOMS), "professors": len(profs),
             "credentials": credentials}

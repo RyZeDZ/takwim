@@ -11,7 +11,7 @@ from ..db import get_db
 from ..models import Absence, Claim, Group, Module, Room, Session, Unavailability, User
 from ..rules import KIND_FOR_GROUP, get_rules
 from ..schemas import AbsenceIn, AvailabilityIn, ClaimIn, SlotSearchIn
-from ..services.catalog import save_availability
+from ..services.catalog import availability_view, save_availability
 from ..services.groups import GroupTree
 from ..services.live import find_slots, occupancy, slot_problems, teaches_group, week_view
 
@@ -52,14 +52,14 @@ def my_groups(user: User = Depends(require_prof), db: DB = Depends(get_db)):
 # ------------------------------------------------------------------ availability grid
 @router.get("/availability", response_model=AvailabilityIn)
 def get_availability(user: User = Depends(require_prof), db: DB = Depends(get_db)):
-    rows = db.scalars(select(Unavailability).where(Unavailability.professor_id == user.professor_id))
-    return {"unavailable": [{"day": u.day, "slot": u.slot} for u in rows]}
+    return availability_view(db, user.professor_id)
 
 
 @router.put("/availability", response_model=AvailabilityIn)
 def put_availability(body: AvailabilityIn, user: User = Depends(require_prof),
                      db: DB = Depends(get_db)):
-    """Replace the professor's grid: the (day, slot) pairs they can't teach. Used at the next generation."""
+    """Replace the professor's grid: the (day, slot) pairs they can't teach ("unavailable") and
+    those they'd rather avoid ("avoid"). Used at the next generation."""
     result = save_availability(db, user.professor_id, body)
     log(db, user, "availability", f"{len(result['unavailable'])} slots")
     db.commit()

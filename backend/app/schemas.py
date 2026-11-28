@@ -62,6 +62,7 @@ class ModuleOut(ModuleIn):
 class TeachingIn(BaseModel):
     module_id: int
     kinds: list[Kind] = ["lecture", "td", "tp"]
+    rank: int = Field(default=1, ge=1)  # 1 = first choice in the professor's wish list
 
 
 class ProfessorIn(BaseModel):
@@ -89,7 +90,8 @@ class SlotRef(BaseModel):
 
 
 class AvailabilityIn(BaseModel):
-    unavailable: list[SlotRef]
+    unavailable: list[SlotRef]  # "I can't": never scheduled there
+    avoid: list[SlotRef] = []  # "I'd rather not": avoided when possible
 
 
 class ImportCommitIn(BaseModel):
