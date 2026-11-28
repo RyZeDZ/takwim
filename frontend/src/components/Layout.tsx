@@ -149,12 +149,14 @@ export function PublicLayout({ children }: { children?: ReactNode }) {
             {t('Free rooms')}
           </NavLink>
           {auth ? (
-            <Link to={auth.role === 'admin' ? '/admin' : '/prof'} className="btn btn-sm">
-              {t('My space')}
+            <Link to={auth.role === 'admin' ? '/admin' : '/prof'} className="btn btn-sm" aria-label={t('My space')}>
+              <Icon name="users" />
+              <span className="hide-narrow">{t('My space')}</span>
             </Link>
           ) : (
-            <Link to="/login" className="btn btn-sm">
-              {t('Staff login')}
+            <Link to="/login" className="btn btn-sm" aria-label={t('Staff login')}>
+              <Icon name="users" />
+              <span className="hide-narrow">{t('Staff login')}</span>
             </Link>
           )}
           <PrefControls />

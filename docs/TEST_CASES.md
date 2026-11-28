@@ -5,7 +5,7 @@ web app (`cd frontend && npm run dev`). Admin login: `ADMIN_USERNAME` / `ADMIN_P
 `backend/.env`. Professor logins: shown once after "Load demo department" (copy them), or
 Professors → "New password". Test each section on a computer **and** on a phone.
 
-Automated coverage already in place: `cd backend && pytest -q` (47 tests) and
+Automated coverage already in place: `cd backend && pytest -q` (50 tests) and
 `python scripts/demo_cases.py` (the 3 jury cases).
 
 ## A. Jury cases (rehearse these first)

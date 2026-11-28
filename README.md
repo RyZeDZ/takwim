@@ -1,89 +1,132 @@
-# Smart timetables for the department
+<p align="center">
+  <img src="docs/images/banner.png" alt="Department timetables: always up to date, clash-free, works offline" width="820">
+</p>
 
-**The problem.** In our computer-science department, the weekly timetable is built by hand in
-Excel. It takes days, clashes slip through (two groups in one room, a professor in two places),
-and it breaks every time something changes: a room closes for repairs, a professor can no
-longer come on Sundays. During the semester, when a professor is absent, the room stays
-empty while another professor is looking for a room to catch up, and students find out about
-cancelled classes at the door. On top of that, the connection on campus is often weak.
+<h1 align="center">Smart timetables for the department</h1>
 
-**What the app does.**
+<p align="center">
+  The weekly timetable of a university department, built in ten seconds with <b>zero clashes</b>,<br>
+  and kept up to date live when a room closes or a professor is absent.<br><br>
+  <b><a href="https://uniplan.elkamel.dev">▶ Try the live demo: uniplan.elkamel.dev</a></b>
+  &nbsp;·&nbsp; Français · العربية · English &nbsp;·&nbsp; works on any phone, even offline
+</p>
 
-- **The administration** uploads the files it already has (Excel, CSV or PDF lists of levels,
-  rooms, modules and professors' wish lists), checks a preview, and clicks **Generate**: the
-  groups are formed from the number of students and a full weekly timetable is built in about
-  ten seconds, with **zero clashes**. When something changes, it clicks again: only what must
-  move moves. Timetables export to Excel and PDF in the usual layout.
-- **Professors** see their week, tap a class to say "I'll be absent" (the room is freed at
-  once), mark the slots they can't teach, and book an extra session: the app proposes the best
-  times when they, their students and a room are all free, preferring rooms freed by an absence.
-  First to book wins.
-- **Students** need no account: they open their group's page (link or QR code) and see
-  *Cancelled* and *New session* labels. The last timetable stays readable with no connection,
-  and a professor's taps made offline are sent when the signal returns.
+---
 
-## The AI inside, and why this one
+## The problem
 
-1. **A constraint solver (Google OR-Tools CP-SAT)** builds the timetable. Strict rules can never
-   be broken: no double booking, the right type of room with enough seats, only professors who
-   teach that module, never in a slot they marked "I can't", within their weekly and daily
-   limits. Preferences are optimised: few empty gaps in a student's day, professors' first
-   choices and "I'd rather not" slots, few changes after an edit. A chatbot cannot guarantee
-   zero clashes for hundreds of students; a solver can, and every result is re-checked before
-   it is saved.
-2. **A small language model running on the computer itself (Qwen2.5 1.5B, through llama.cpp)**
-   helps read messy files: when a column is called "Cap. accueil" or "Nbre de places assises",
-   it suggests which field it is. The administrator always confirms in the preview.
+In our computer-science department the timetable is still built **by hand in Excel**.
 
-## What we measured (ordinary laptop, no graphics card)
+- 🕐 It takes **days**, and **clashes slip through**: two groups in one room, a professor in two places at once.
+- 🔁 It breaks **every time something changes**: a room closes for repairs, a professor can't come on Sundays any more.
+- 🚪 When a professor is absent, the room **stays empty** while a colleague looks for one to catch up, and students learn about the cancelled class **at the door**.
+- 📶 And the connection on campus is often weak.
 
-Synthetic department: 6 levels, 24 groups, 20 professors, 21 rooms, **172 sessions per week**.
-Laptop: AMD Ryzen 7 6800H, 16 GB RAM; the solver uses 4 CPU threads.
+## What the app does
 
-| | Built-in quick method | AI solver (CP-SAT) |
+### For the department's administration
+
+Upload the files you already have (Excel, CSV or PDF lists of levels, rooms, modules and
+professors' wish lists), check the preview, and click **Generate**. About ten seconds later
+every class has a time, a room and a professor, with **no clash**. When something changes, click
+again: **only what has to move moves**, and the app lists what changed and why.
+
+<p align="center"><img src="docs/images/generate-result.png" alt="After closing a room: 195 of 195 sessions placed, 0 clashes, and the list of the 22 classes that moved out of the closed room" width="760"></p>
+
+When the files use unusual column names ("Cap. accueil" for the number of seats), a small AI
+on the server suggests the match. Nothing is saved until the administrator confirms.
+
+<p align="center"><img src="docs/images/import.png" alt="Import preview: each column of the file matched to a field, with AI suggestions marked" width="760"></p>
+
+### For professors
+
+See your week, tap a class and say **"I'll be absent"**: the students are told and the room is
+freed at once. Need a make-up class? The app proposes the **best times** when you, your students
+and a room are all free, starting with rooms freed by a colleague's absence. First to book wins.
+Professors also mark the slots they **can't** teach, or would **rather not**.
+
+<p align="center"><img src="docs/images/professor-extra.png" alt="Extra session: six ranked options with the reasons for each one, and a Book button" width="760"></p>
+
+### For students: no account needed
+
+Open your group's page (a link or a QR code) and see this week's classes, with **Cancelled** and
+**New session** labels the moment a professor declares them, and what's **next** today. The last
+timetable opened stays readable **without a connection**, and the app can be installed on the
+phone. In French, Arabic or English, light or dark.
+
+<p align="center"><img src="docs/images/student-phones.png" alt="The same group timetable on three phones: English, French in dark mode, Arabic. A cancelled class and a new session are shown" width="820"></p>
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["📄 The department's files<br/>Excel · CSV · PDF"] -->|read and checked| B["🗂️ Department data<br/>levels · rooms · modules · professors"]
+    B -->|Generate| C["🧠 Timetable solver<br/>zero clashes, fewest gaps"]
+    C --> D["📅 Timetables<br/>per group · professor · room<br/>Excel and PDF"]
+    D --> E["📱 Students and professors<br/>live changes, works offline"]
+    E -->|absence, extra session| D
+```
+
+**Two pieces of AI, both running on the server itself (no internet, no graphics card):**
+
+1. **A timetable solver** (Google OR-Tools, the kind of tool used to plan airline crews). Some
+   rules can never be broken: nobody in two places at once, a room big enough and of the right
+   kind, a professor only teaches their own modules and never in a slot they can't do, within
+   their weekly and daily limits. Within those rules it looks for the best timetable: few empty
+   gaps in a student's day, a break after 3 classes in a row, each professor's first choices, and
+   as few changes as possible when something moves. *Why not a chatbot?* A chatbot can't promise
+   zero clashes for hundreds of students; a solver can, and every timetable is checked again
+   before it's saved.
+2. **A small language model** (Qwen2.5, 1.1 GB) that reads messy column names in the
+   department's files and suggests what each one means.
+
+## What we measured
+
+On an ordinary laptop (AMD Ryzen 7, 16 GB of memory, no graphics card), with an invented
+department of **8 levels, 29 groups, 22 professors, 21 rooms and 195 classes a week**:
+
+| | Simple method (for comparison) | **Our AI solver** |
 | --- | --- | --- |
-| Sessions placed | 172 / 172 | 172 / 172 |
-| Clashes | 0 | 0 |
-| Empty slots between classes that are not a needed break, per group per week | 0.61 | **0.39 to 0.50** |
-| Classes beyond 3 in a row with no break (whole department, per week) | 11 | **6 to 9** |
-| Days with a single class (students come in for one session) | 6 | **0 to 3** |
-| TD / TP placed before its lecture on the same day | 5 | **1 to 2** |
-| Sessions moved when a busy room closes | only the ones in that room | only the ones in that room |
-| Time to generate | 0.02 s | 10 s (time limit, adjustable) |
+| Classes placed | 195 of 195 | **195 of 195** |
+| Clashes | 0 | **0** |
+| Empty gaps in a student's day (per group, per week) | 0.48 | **0.33** |
+| Classes after 3 in a row with no break | 13 | **9** |
+| Days when students come in for a single class | 9 | **1** |
+| When a busy room closes | its classes move, almost nothing else | **its classes move, almost nothing else** |
+| Time to build the timetable | instant | **10 seconds** |
 
-AI solver ranges are over several runs. After 3 classes in a row the solver tries to leave a
-free slot (the admin sets the number in Settings).
+- **Messy files:** out of 40 columns with unusual names, the built-in dictionary recognises
+  68 %; with the language model, **88 %**. The rest is fixed by the administrator in the preview.
+- **Light:** the server needs about **0.5 GB** of memory while building a timetable, and 1.9 GB
+  while the language model reads a file. It runs on any recent laptop or small server.
+- **Reliable:** 50 automated tests check every rule, including the three demo cases.
 
-- **Messy headers:** on 10 test files written like department files (40 columns to recognise),
-  the dictionary alone gets **68 %** right; with the language model, **88 %** (1 wrong
-  suggestion, caught in the preview), about 1.3 s per file.
-- **Memory:** the server peaks at about 460 MB while generating; about 1.9 GB once the
-  language model is loaded for an import. **Model size on disk:** 1.1 GB. No internet needed.
-- Extra-session search: under a second. All 47 automated tests pass.
+## Limits
+
+- An extra session lasts one time slot (no double-length bookings).
+- The solver stops after 10 seconds: the timetable is always valid, but not proven to be the
+  best one possible.
+- A practical class needs a lab at least as large as the group.
+- Photos of paper documents can't be read; PDFs exported from Word or Excel can.
+- The demo uses **invented data only**: no real names, no personal data.
 
 ## Try it
 
-```bash
-# Backend (Python 3.11+)
-cd backend && python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env        # choose ADMIN_USERNAME / ADMIN_PASSWORD; DEMO_MODE=1 for the demo
-uvicorn app.main:app
+- **Online:** open **[uniplan.elkamel.dev](https://uniplan.elkamel.dev)**. Students need nothing;
+  the administrator and professor logins are given with our submission.
+- **Three things to try:** close a room and click Generate · mark a professor "can't" on Sunday
+  and Generate · as a professor, declare an absence, then book the freed room as another one and
+  watch the student page.
+- **On your own computer** (Python 3.11+ and Node 20+):
 
-# Web app (Node 20+), in another terminal
-cd frontend && npm install && cp .env.example .env && npm run dev
-```
+  ```bash
+  cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+  cp .env.example .env    # set ADMIN_USERNAME, ADMIN_PASSWORD and DEMO_MODE=1
+  uvicorn app.main:app    # then, in another terminal:
+  cd frontend && npm install && cp .env.example .env && npm run dev
+  ```
 
-Open http://localhost:5173, log in as the administrator, click **Load demo department**, then
-**Generate**. The three demo cases (a room closes, a professor can't teach on Sundays anymore,
-a professor is absent and another books the freed room) also run on their own with
-`python backend/scripts/demo_cases.py`.
+  Open http://localhost:5173, log in as the administrator, click **Load demo department**, then
+  **Generate**.
 
-## Limits (stated, not hidden)
-
-- An extra session is one time slot; no double-length bookings.
-- The solver stops at its time limit: the timetable is always valid, but not proven to be the
-  best possible one.
-- A practical class needs a lab at least as large as the group.
-- Scanned paper (photos) is not read; PDFs exported from Word or Excel are.
-- All data in the demo is synthetic: no real names or personal data.
+<sub>For technical readers: [how the AI works](docs/AI.md) · [hosting](docs/DEPLOY.md) · [test checklist](docs/TEST_CASES.md) · [backend](backend/README.md) · [web app](frontend/README.md)</sub>
