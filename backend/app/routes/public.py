@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
 
+from ..config import settings
 from ..db import get_db
 from ..models import Group, Level, Room
 from ..rules import get_rules
@@ -19,8 +20,11 @@ def config(db: DB = Depends(get_db)):
     """Days and time slots, so the frontend draws the grid the same way as the backend."""
     rules = get_rules(db)
     today = date.today()
-    return {"days": rules.day_names, "slots": rules.time_slots, "today": today.isoformat(),
+    return {"app_name": settings.app_name,
+            "days": rules.day_names, "slots": rules.time_slots, "today": today.isoformat(),
             "week_start": rules.week_start(today).isoformat(),
+            # The week to show by default: this one, or the next one once this week is over.
+            "display_date": rules.default_search_range(today)[0].isoformat(),
             "today_is_working_day": rules.is_working_day(today)}
 
 
