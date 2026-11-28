@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { PublicLayout, Shell } from './components/Layout'
 import { ConfigProvider, ToastProvider, useAuth } from './lib/hooks'
+import { PrefsProvider } from './lib/i18n'
 import { Dashboard, Timetable } from './pages/admin/timetable'
 import { Levels, Modules, Professors, Rooms } from './pages/admin/data'
 import { Import } from './pages/admin/import'
@@ -58,6 +59,7 @@ function RequireRole({ role, children }: { role: 'admin' | 'prof'; children: Rea
 
 export default function App() {
   return (
+    <PrefsProvider>
     <ConfigProvider>
       <ToastProvider>
         <BrowserRouter>
@@ -104,5 +106,6 @@ export default function App() {
         </BrowserRouter>
       </ToastProvider>
     </ConfigProvider>
+    </PrefsProvider>
   )
 }

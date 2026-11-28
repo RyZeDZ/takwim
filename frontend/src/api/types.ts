@@ -8,6 +8,7 @@ export interface Config {
   week_start: string
   display_date: string // the week shown by default (next week once this one is over)
   today_is_working_day: boolean
+  solver_seconds?: number
 }
 
 export interface GroupNode {
@@ -119,6 +120,30 @@ export interface Stats {
   freed_rooms_reused: number
 }
 
+export interface Fix {
+  code: 'no_teacher' | 'no_room_type' | 'room_too_small' | 'profs_full' | 'no_common_time'
+  types?: string[]
+  size?: number
+  biggest?: number
+  professors?: string[]
+}
+
+export interface Place {
+  day: number
+  slot: number
+  room: string
+  professor: string
+}
+
+export interface Change {
+  module: string
+  kind: string
+  group: string
+  from: Place
+  to: Place
+  reason: 'room_closed' | 'slot_removed' | 'prof_unavailable' | 'knock_on'
+}
+
 export interface GenerateResult {
   solver: string
   solver_stats?: { status: string; objective: number; best_bound: number; seconds: number } | null
@@ -127,7 +152,8 @@ export interface GenerateResult {
   groups_rebuilt_for: string[]
   requirements: number
   placed: number
-  unscheduled: { requirement_id: string; reason: string; module: string; group: string; kind: string }[]
+  unscheduled: { requirement_id: string; reason: string; module: string; group: string; kind: string; fix?: Fix }[]
+  changes?: Change[]
   conflicts: string[]
   sessions_moved: number | null
   gaps_per_group_per_week: number | null

@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { Availability, Credential, Kind, Level, Module, Professor, Room, Teaching } from '../../api/types'
 import { PageHead } from '../../components/Layout'
-import { CredentialsTable, Dialog, ErrorBox, Icon, Loading } from '../../components/ui'
+import { CredentialsTable, Dialog, ErrorBox, Icon, ListSkeleton } from '../../components/ui'
 import { errorText, useLoad, useToast } from '../../lib/hooks'
 import { AvailabilityEditor } from '../prof'
-import { ROOM_TYPE } from '../public'
+import { roomType } from '../public'
+import { t } from '../../lib/i18n'
+import { kindLabel } from '../../lib/dates'
 
 const KINDS: Kind[] = ['lecture', 'td', 'tp']
-const KIND_LABEL: Record<Kind, string> = { lecture: 'Lecture', td: 'TD', tp: 'TP' }
 
 function useAction() {
   const toast = useToast()
@@ -37,50 +38,50 @@ export function Rooms() {
   const toggle = (r: Room) =>
     act(
       () => api.patch(`/admin/rooms/${r.id}`, { active: !r.active }),
-      r.active ? `${r.name} closed. Generate the timetable again to move its sessions.` : `${r.name} reopened`,
+      r.active ? t('{room} closed. Generate the timetable again to move its sessions.', { room: r.name }) : t('{room} reopened', { room: r.name }),
     ).then(rooms.reload)
 
   return (
     <div className="stack">
-      <PageHead title="Rooms" intro="Lecture halls, classrooms and labs. Close a room (repairs, exams) and regenerate: its sessions move elsewhere.">
+      <PageHead title={t('Rooms')} intro={t('Lecture halls, classrooms and labs. Close a room (repairs, exams) and regenerate: its sessions move elsewhere.')}>
         <button className="btn btn-primary" onClick={() => setEdit({ type: 'td', capacity: 40, active: true })}>
-          <Icon name="plus" /> Add room
+          <Icon name="plus" /> {t('Add room')}
         </button>
       </PageHead>
       {rooms.data && (
         <div className="stats">
           <div className="stat">
-            <span className="stat-label">Open rooms</span>
+            <span className="stat-label">{t('Open rooms')}</span>
             <span className="stat-value">{open.length}</span>
-            <span className="stat-note">{(rooms.data.length - open.length) || 'none'} closed</span>
+            <span className="stat-note">{t('{n} closed', { n: rooms.data.length - open.length })}</span>
           </div>
           <div className="stat">
-            <span className="stat-label">Seats</span>
+            <span className="stat-label">{t('Seats')}</span>
             <span className="stat-value">{open.reduce((n, r) => n + r.capacity, 0)}</span>
           </div>
-          {(['amphi', 'td', 'lab'] as const).map((t) => (
-            <div className="stat" key={t}>
-              <span className="stat-label">{ROOM_TYPE[t]}s</span>
-              <span className="stat-value">{open.filter((r) => r.type === t).length}</span>
+          {(['amphi', 'td', 'lab'] as const).map((ty) => (
+            <div className="stat" key={ty}>
+              <span className="stat-label">{roomType(ty)}</span>
+              <span className="stat-value">{open.filter((r) => r.type === ty).length}</span>
             </div>
           ))}
         </div>
       )}
       {rooms.error && <ErrorBox error={rooms.error} onRetry={rooms.reload} />}
-      {rooms.loading && !rooms.data && <Loading />}
+      {rooms.loading && !rooms.data && <div className="panel"><ListSkeleton /></div>}
       {rooms.data && (
         <section className="panel panel-tight">
           <div className="panel-head">
-            <input className="input" placeholder="Search rooms" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search rooms" />
+            <input className="input" type="search" placeholder={t('Search rooms')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('Search rooms')} />
           </div>
           <div className="table-wrap" style={{ marginTop: 16 }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Room</th>
-                  <th>Type</th>
-                  <th>Seats</th>
-                  <th>Status</th>
+                  <th>{t('Room')}</th>
+                  <th>{t('Type')}</th>
+                  <th>{t('Seats')}</th>
+                  <th>{t('Status')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -90,16 +91,16 @@ export function Rooms() {
                     <td>
                       <strong>{r.name}</strong>
                     </td>
-                    <td>{ROOM_TYPE[r.type]}</td>
+                    <td>{roomType(r.type)}</td>
                     <td className="num">{r.capacity}</td>
-                    <td>{r.active ? <span className="badge badge-new">Open</span> : <span className="badge badge-closed">Closed</span>}</td>
+                    <td>{r.active ? <span className="badge badge-new">{t('Open')}</span> : <span className="badge badge-closed">{t('Closed')}</span>}</td>
                     <td className="actions">
                       <div className="row" style={{ justifyContent: 'flex-end' }}>
                         <button className={'btn btn-sm' + (r.active ? ' btn-danger' : '')} onClick={() => toggle(r)}>
-                          {r.active ? 'Close' : 'Reopen'}
+                          {r.active ? t('Close') : t('Reopen')}
                         </button>
                         <button className="btn btn-sm" onClick={() => setEdit(r)}>
-                          Edit
+                          {t('Edit')}
                         </button>
                       </div>
                     </td>
@@ -126,51 +127,51 @@ function RoomDialog({ room, onClose, onSaved }: { room: Partial<Room> | null; on
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const body = { name: form.name, type: form.type, capacity: Number(form.capacity), active: form.active ?? true }
-    const ok = await act(() => (room?.id ? api.patch(`/admin/rooms/${room.id}`, body) : api.post('/admin/rooms', body)), 'Room saved')
+    const ok = await act(() => (room?.id ? api.patch(`/admin/rooms/${room.id}`, body) : api.post('/admin/rooms', body)), t('Room saved'))
     if (ok) {
       onSaved()
       onClose()
     }
   }
   const remove = async () => {
-    if (!room?.id || !confirm(`Delete ${room.name}? Its sessions will be removed from the timetable.`)) return
-    if (await act(() => api.del(`/admin/rooms/${room.id}`), 'Room deleted')) {
+    if (!room?.id || !confirm(t('Delete {name}? Its sessions will be removed from the timetable.', { name: room.name ?? '' }))) return
+    if (await act(() => api.del(`/admin/rooms/${room.id}`), t('Room deleted'))) {
       onSaved()
       onClose()
     }
   }
   return (
-    <Dialog open={!!room} onClose={onClose} title={room?.id ? `Edit ${room.name}` : 'Add a room'}>
+    <Dialog open={!!room} onClose={onClose} title={room?.id ? t('Edit {name}', { name: room.name ?? '' }) : t('Add a room')}>
       <form className="stack-sm" onSubmit={submit}>
         <label className="field">
-          Name
+          {t('Name')}
           <input className="input" value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         </label>
         <div className="form-grid">
           <label className="field">
-            Type
+            {t('Type')}
             <select className="select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Room['type'] })}>
-              {(['amphi', 'td', 'lab'] as const).map((t) => (
-                <option key={t} value={t}>
-                  {ROOM_TYPE[t]}
+              {(['amphi', 'td', 'lab'] as const).map((ty) => (
+                <option key={ty} value={ty}>
+                  {roomType(ty)}
                 </option>
               ))}
             </select>
           </label>
           <label className="field">
-            Seats
+            {t('Seats')}
             <input className="input" type="number" min={1} value={form.capacity ?? ''} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} required />
           </label>
         </div>
         <div className="row-between">
           {room?.id ? (
             <button type="button" className="btn btn-danger" onClick={remove}>
-              Delete
+              {t('Delete')}
             </button>
           ) : (
             <span />
           )}
-          <button className="btn btn-primary">Save</button>
+          <button className="btn btn-primary">{t('Save')}</button>
         </div>
       </form>
     </Dialog>
@@ -188,35 +189,35 @@ export function Levels() {
     e.preventDefault()
     if (!edit) return
     const body = { name: edit.name, headcount: Number(edit.headcount) }
-    const ok = await act(() => (edit.id ? api.patch(`/admin/levels/${edit.id}`, body) : api.post('/admin/levels', body)), 'Level saved')
+    const ok = await act(() => (edit.id ? api.patch(`/admin/levels/${edit.id}`, body) : api.post('/admin/levels', body)), t('Level saved'))
     if (ok) {
       setEdit(null)
       levels.reload()
     }
   }
   const remove = async (lv: Level) => {
-    if (!confirm(`Delete ${lv.name}, its modules and its groups?`)) return
-    if (await act(() => api.del(`/admin/levels/${lv.id}`), 'Level deleted')) levels.reload()
+    if (!confirm(t('Delete {name}, its modules and its groups?', { name: lv.name }))) return
+    if (await act(() => api.del(`/admin/levels/${lv.id}`), t('Level deleted'))) levels.reload()
   }
 
   return (
     <div className="stack">
-      <PageHead title="Levels and specialities" intro="Each level with its number of students. Groups are built from these headcounts when the timetable is generated.">
+      <PageHead title={t('Levels and specialities')} intro={t('Each level with its number of students. Groups are built from these headcounts when the timetable is generated.')}>
         <button className="btn btn-primary" onClick={() => setEdit({ headcount: 60 })}>
-          <Icon name="plus" /> Add level
+          <Icon name="plus" /> {t('Add level')}
         </button>
       </PageHead>
       {levels.error && <ErrorBox error={levels.error} onRetry={levels.reload} />}
-      {levels.loading && !levels.data && <Loading />}
+      {levels.loading && !levels.data && <div className="panel"><ListSkeleton /></div>}
       {levels.data && (
         <section className="panel panel-tight">
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Level</th>
-                  <th>Students</th>
-                  <th>Modules</th>
+                  <th>{t('Level')}</th>
+                  <th>{t('Students')}</th>
+                  <th>{t('Modules')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -231,13 +232,13 @@ export function Levels() {
                     <td className="actions">
                       <div className="row" style={{ justifyContent: 'flex-end' }}>
                         <Link className="btn btn-sm" to={`/admin/modules?level=${lv.id}`}>
-                          Modules
+                          {t('Modules')}
                         </Link>
                         <button className="btn btn-sm" onClick={() => setEdit(lv)}>
-                          Edit
+                          {t('Edit')}
                         </button>
                         <button className="btn btn-sm btn-danger" onClick={() => remove(lv)}>
-                          Delete
+                          {t('Delete')}
                         </button>
                       </div>
                     </td>
@@ -246,22 +247,22 @@ export function Levels() {
               </tbody>
             </table>
           </div>
-          {levels.data.length === 0 && <p className="muted small" style={{ padding: 20 }}>No levels yet. Add one or import a file.</p>}
+          {levels.data.length === 0 && <p className="muted small" style={{ padding: 20 }}>{t('No levels yet. Add one or import a file.')}</p>}
         </section>
       )}
-      <Dialog open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? `Edit ${edit.name}` : 'Add a level'}>
+      <Dialog open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? t('Edit {name}', { name: edit.name ?? '' }) : t('Add a level')}>
         {edit && (
           <form className="stack-sm" onSubmit={save}>
             <label className="field">
-              Name (level and speciality)
-              <input className="input" placeholder="e.g. L3 ISIL" value={edit.name ?? ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} required />
+              {t('Name (level and speciality)')}
+              <input className="input" placeholder={t('e.g. L3 ISIL')} value={edit.name ?? ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} required />
             </label>
             <label className="field">
-              Number of students
+              {t('Number of students')}
               <input className="input" type="number" min={1} value={edit.headcount ?? ''} onChange={(e) => setEdit({ ...edit, headcount: Number(e.target.value) })} required />
             </label>
             <button className="btn btn-primary" style={{ alignSelf: 'end' }}>
-              Save
+              {t('Save')}
             </button>
           </form>
         )}
@@ -290,52 +291,52 @@ export function Modules() {
       td_per_week: Number(edit.td_per_week ?? 0),
       tp_per_week: Number(edit.tp_per_week ?? 0),
     }
-    const ok = await act(() => (edit.id ? api.patch(`/admin/modules/${edit.id}`, body) : api.post('/admin/modules', body)), 'Module saved')
+    const ok = await act(() => (edit.id ? api.patch(`/admin/modules/${edit.id}`, body) : api.post('/admin/modules', body)), t('Module saved'))
     if (ok) {
       setEdit(null)
       modules.reload()
     }
   }
   const remove = async (m: Module) => {
-    if (!confirm(`Delete ${m.name}?`)) return
-    if (await act(() => api.del(`/admin/modules/${m.id}`), 'Module deleted')) modules.reload()
+    if (!confirm(t('Delete {name}?', { name: m.name }))) return
+    if (await act(() => api.del(`/admin/modules/${m.id}`), t('Module deleted'))) modules.reload()
   }
 
   return (
     <div className="stack">
-      <PageHead title="Modules" intro="Weekly load of each module, counted in sessions (one time slot each): lectures for the whole section, TD and TP per group.">
+      <PageHead title={t('Modules')} intro={t('Weekly load of each module, counted in sessions (one time slot each): lectures for the whole section, TD and TP per group.')}>
         <button
           className="btn btn-primary"
           disabled={!levels.data?.length}
           onClick={() => setEdit({ level_id: Number(level) || levels.data?.[0]?.id, lecture_per_week: 1, td_per_week: 1, tp_per_week: 0 })}
         >
-          <Icon name="plus" /> Add module
+          <Icon name="plus" /> {t('Add module')}
         </button>
       </PageHead>
       <div className="row">
-        <select className="select" value={level} onChange={(e) => setLevel(e.target.value)} aria-label="Filter by level">
-          <option value="">All levels</option>
+        <select className="select" value={level} onChange={(e) => setLevel(e.target.value)} aria-label={t('Filter by level')}>
+          <option value="">{t('All levels')}</option>
           {levels.data?.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
             </option>
           ))}
         </select>
-        <span className="small muted">{list.length} modules</span>
+        <span className="small muted">{t('{n} modules', { n: list.length })}</span>
       </div>
       {modules.error && <ErrorBox error={modules.error} onRetry={modules.reload} />}
-      {modules.loading && !modules.data && <Loading />}
+      {modules.loading && !modules.data && <div className="panel"><ListSkeleton /></div>}
       {modules.data && (
         <section className="panel panel-tight">
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Module</th>
-                  <th>Level</th>
-                  <th>Lectures / week</th>
-                  <th>TD / week</th>
-                  <th>TP / week</th>
+                  <th>{t('Module')}</th>
+                  <th>{t('Level')}</th>
+                  <th>{t('Lectures / week')}</th>
+                  <th>{t('TD / week')}</th>
+                  <th>{t('TP / week')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -352,10 +353,10 @@ export function Modules() {
                     <td className="actions">
                       <div className="row" style={{ justifyContent: 'flex-end' }}>
                         <button className="btn btn-sm" onClick={() => setEdit(m)}>
-                          Edit
+                          {t('Edit')}
                         </button>
                         <button className="btn btn-sm btn-danger" onClick={() => remove(m)}>
-                          Delete
+                          {t('Delete')}
                         </button>
                       </div>
                     </td>
@@ -366,15 +367,15 @@ export function Modules() {
           </div>
         </section>
       )}
-      <Dialog open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? `Edit ${edit.name}` : 'Add a module'}>
+      <Dialog open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? t('Edit {name}', { name: edit.name ?? '' }) : t('Add a module')}>
         {edit && (
           <form className="stack-sm" onSubmit={save}>
             <label className="field">
-              Name
+              {t('Name')}
               <input className="input" value={edit.name ?? ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} required />
             </label>
             <label className="field">
-              Level
+              {t('Level')}
               <select className="select" value={edit.level_id} onChange={(e) => setEdit({ ...edit, level_id: Number(e.target.value) })}>
                 {levels.data?.map((l) => (
                   <option key={l.id} value={l.id}>
@@ -386,13 +387,13 @@ export function Modules() {
             <div className="form-grid">
               {(['lecture_per_week', 'td_per_week', 'tp_per_week'] as const).map((k) => (
                 <label className="field" key={k}>
-                  {k === 'lecture_per_week' ? 'Lectures' : k === 'td_per_week' ? 'TD' : 'TP'} per week
+                  {k === 'lecture_per_week' ? t('Lectures per week') : k === 'td_per_week' ? t('TD per week') : t('TP per week')}
                   <input className="input" type="number" min={0} value={edit[k] ?? 0} onChange={(e) => setEdit({ ...edit, [k]: Number(e.target.value) })} />
                 </label>
               ))}
             </div>
             <button className="btn btn-primary" style={{ alignSelf: 'end' }}>
-              Save
+              {t('Save')}
             </button>
           </form>
         )}
@@ -422,7 +423,7 @@ export function Professors() {
   const list = (profs.data ?? []).filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
 
   const reset = async (p: Professor) => {
-    if (!confirm(`Give ${p.name} a new password? The old one stops working.`)) return
+    if (!confirm(t('Give {name} a new password? The old one stops working.', { name: p.name }))) return
     await act(async () => {
       const r = await api.post<{ username: string; password: string }>(`/admin/professors/${p.id}/reset-password`)
       setCreds([{ name: p.name, ...r }])
@@ -431,30 +432,30 @@ export function Professors() {
 
   return (
     <div className="stack">
-      <PageHead title="Professors" intro="Who teaches what (in order of preference), their weekly maximum, and their availability.">
+      <PageHead title={t('Professors')} intro={t('Who teaches what (in order of preference), their weekly maximum, and their availability.')}>
         <button className="btn btn-primary" onClick={() => setEdit({ teaches: [] })}>
-          <Icon name="plus" /> Add professor
+          <Icon name="plus" /> {t('Add professor')}
         </button>
       </PageHead>
       {profs.error && <ErrorBox error={profs.error} onRetry={profs.reload} />}
-      {profs.loading && !profs.data && <Loading />}
+      {profs.loading && !profs.data && <div className="panel"><ListSkeleton /></div>}
       {profs.data && (
         <section className="panel panel-tight">
           <div className="panel-head">
-            <input className="input" placeholder="Search professors" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search professors" />
+            <input className="input" type="search" placeholder={t('Search professors')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('Search professors')} />
             <span className="small muted">
-              {profs.data.length} professors · {profs.data.filter((p) => p.availability_filled).length} filled their availability
+              {t('{n} professors · {m} filled their availability', { n: profs.data.length, m: profs.data.filter((p) => p.availability_filled).length })}
             </span>
           </div>
           <div className="table-wrap" style={{ marginTop: 16 }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Login</th>
-                  <th>Max / week</th>
-                  <th>Teaches (1st choice first)</th>
-                  <th>Availability</th>
+                  <th>{t('Name')}</th>
+                  <th>{t('Login')}</th>
+                  <th>{t('Max / week')}</th>
+                  <th>{t('Teaches (1st choice first)')}</th>
+                  <th>{t('Availability')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -469,24 +470,24 @@ export function Professors() {
                     </td>
                     <td className="num">{p.max_sessions}</td>
                     <td className="small">
-                      {p.teaches.length === 0 && <span className="muted">Nothing yet</span>}
-                      {p.teaches.map((t) => (
-                        <div key={t.module_id}>
-                          {t.rank}. {moduleName(t.module_id)} · {t.kinds.map((k) => KIND_LABEL[k]).join(', ')}
+                      {p.teaches.length === 0 && <span className="muted">{t('Nothing yet')}</span>}
+                      {p.teaches.map((tc) => (
+                        <div key={tc.module_id}>
+                          {tc.rank}. {moduleName(tc.module_id)} · {tc.kinds.map((k) => kindLabel(k)).join(', ')}
                         </div>
                       ))}
                     </td>
-                    <td>{p.availability_filled ? <span className="badge badge-new">Filled</span> : <span className="badge badge-neutral">Not yet</span>}</td>
+                    <td>{p.availability_filled ? <span className="badge badge-new">{t('Filled')}</span> : <span className="badge badge-neutral">{t('Not yet')}</span>}</td>
                     <td className="actions">
                       <div className="row" style={{ justifyContent: 'flex-end' }}>
                         <button className="btn btn-sm" onClick={() => setEdit(p)}>
-                          Edit
+                          {t('Edit')}
                         </button>
                         <button className="btn btn-sm" onClick={() => setAvail(p)}>
-                          Availability
+                          {t('Availability')}
                         </button>
                         <button className="btn btn-sm" onClick={() => reset(p)}>
-                          New password
+                          {t('New password')}
                         </button>
                       </div>
                     </td>
@@ -507,10 +508,10 @@ export function Professors() {
           if (c) setCreds(c)
         }}
       />
-      <Dialog open={!!avail} onClose={() => setAvail(null)} title={`Availability of ${avail?.name ?? ''}`} wide>
+      <Dialog open={!!avail} onClose={() => setAvail(null)} title={t('Availability of {name}', { name: avail?.name ?? '' })} wide>
         {avail && <ProfAvailability prof={avail} onSaved={profs.reload} />}
       </Dialog>
-      <Dialog open={!!creds} onClose={() => setCreds(null)} title="Login to give to the professor" wide>
+      <Dialog open={!!creds} onClose={() => setCreds(null)} title={t('Login to give to the professor')} wide>
         {creds && <CredentialsTable rows={creds} />}
       </Dialog>
     </div>
@@ -527,7 +528,7 @@ function ProfAvailability({ prof, onSaved }: { prof: Professor; onSaved: () => v
     },
     [prof.id, onSaved],
   )
-  return <AvailabilityEditor load={load} save={save} intro="Fill the grid on the professor's behalf (for example from their paper form)." />
+  return <AvailabilityEditor load={load} save={save} intro={t("Fill the grid on the professor's behalf (for example from their paper form).")} />
 }
 
 function ProfessorDialog({
@@ -583,54 +584,54 @@ function ProfessorDialog({
         onSaved([{ name: r.name, username: r.username ?? '', password: r.password }])
       }
       onClose()
-    }, 'Professor saved')
+    }, t('Professor saved'))
   }
   const remove = async () => {
-    if (!prof?.id || !confirm(`Delete ${prof.name}? Their sessions will be removed from the timetable.`)) return
-    if (await act(() => api.del(`/admin/professors/${prof.id}`), 'Professor deleted')) {
+    if (!prof?.id || !confirm(t('Delete {name}? Their sessions will be removed from the timetable.', { name: prof.name ?? '' }))) return
+    if (await act(() => api.del(`/admin/professors/${prof.id}`), t('Professor deleted'))) {
       onSaved()
       onClose()
     }
   }
 
   return (
-    <Dialog open={!!prof} onClose={onClose} title={prof?.id ? `Edit ${prof.name}` : 'Add a professor'} wide>
+    <Dialog open={!!prof} onClose={onClose} title={prof?.id ? t('Edit {name}', { name: prof.name ?? '' }) : t('Add a professor')} wide>
       <form className="stack-sm" onSubmit={submit}>
         <div className="form-grid">
           <label className="field" style={{ gridColumn: 'span 2' }}>
-            Full name
+            {t('Full name')}
             <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
           </label>
           <label className="field">
-            Max sessions per week
-            <input className="input" type="number" min={1} placeholder="Department default" value={max} onChange={(e) => setMax(e.target.value)} />
+            {t('Max sessions per week')}
+            <input className="input" type="number" min={1} placeholder={t('Department default')} value={max} onChange={(e) => setMax(e.target.value)} />
           </label>
         </div>
-        <h3>Teaches, in order of preference</h3>
-        <p className="small muted">The first module is their first choice. The timetable tries to give each professor their preferred modules.</p>
-        {teaches.length === 0 && <p className="small muted">No module yet.</p>}
+        <h3>{t('Teaches, in order of preference')}</h3>
+        <p className="small muted">{t('The first module is their first choice. The timetable tries to give each professor their preferred modules.')}</p>
+        {teaches.length === 0 && <p className="small muted">{t('No module yet.')}</p>}
         <ol className="options">
-          {teaches.map((t, i) => (
-            <li key={t.module_id} className="option" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
+          {teaches.map((tc, i) => (
+            <li key={tc.module_id} className="option" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
               <span className="option-rank">{i + 1}</span>
               <div className="stack-sm" style={{ gap: 4 }}>
-                <strong>{moduleName(t.module_id)}</strong>
+                <strong>{moduleName(tc.module_id)}</strong>
                 <div className="row">
                   {KINDS.map((k) => (
                     <label key={k} className="check">
-                      <input type="checkbox" checked={t.kinds.includes(k)} onChange={() => toggleKind(i, k)} /> {KIND_LABEL[k]}
+                      <input type="checkbox" checked={tc.kinds.includes(k)} onChange={() => toggleKind(i, k)} /> {kindLabel(k)}
                     </label>
                   ))}
                 </div>
               </div>
               <div className="row" style={{ gap: 4 }}>
-                <button type="button" className="btn btn-sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">
+                <button type="button" className="btn btn-sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label={t('Move up')}>
                   ↑
                 </button>
-                <button type="button" className="btn btn-sm" disabled={i === teaches.length - 1} onClick={() => move(i, 1)} aria-label="Move down">
+                <button type="button" className="btn btn-sm" disabled={i === teaches.length - 1} onClick={() => move(i, 1)} aria-label={t('Move down')}>
                   ↓
                 </button>
-                <button type="button" className="btn btn-sm btn-danger" onClick={() => setTeaches(teaches.filter((_, j) => j !== i))} aria-label="Remove">
+                <button type="button" className="btn btn-sm btn-danger" onClick={() => setTeaches(teaches.filter((_, j) => j !== i))} aria-label={t('Remove')}>
                   ✕
                 </button>
               </div>
@@ -638,8 +639,8 @@ function ProfessorDialog({
           ))}
         </ol>
         <div className="row">
-          <select className="select" value={adding} onChange={(e) => setAdding(e.target.value)} style={{ flex: 1 }} aria-label="Module to add">
-            <option value="">Add a module…</option>
+          <select className="select" value={adding} onChange={(e) => setAdding(e.target.value)} style={{ flex: 1 }} aria-label={t('Module to add')}>
+            <option value="">{t('Add a module…')}</option>
             {available.map((m) => (
               <option key={m.id} value={m.id}>
                 {moduleName(m.id)}
@@ -655,18 +656,18 @@ function ProfessorDialog({
               setAdding('')
             }}
           >
-            Add
+            {t('Add')}
           </button>
         </div>
         <div className="row-between" style={{ marginTop: 8 }}>
           {prof?.id ? (
             <button type="button" className="btn btn-danger" onClick={remove}>
-              Delete
+              {t('Delete')}
             </button>
           ) : (
             <span />
           )}
-          <button className="btn btn-primary">Save</button>
+          <button className="btn btn-primary">{t('Save')}</button>
         </div>
       </form>
     </Dialog>

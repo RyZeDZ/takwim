@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { getAuth, getCached, pendingActions, replayQueue, type Auth } from '../api/client'
 import type { Config } from '../api/types'
+import { t } from './i18n'
 
 // ------------------------------------------------------------------ data loading
 export interface Loaded<T> {
@@ -36,8 +37,8 @@ export function useLoad<T>(path: string | null): Loaded<T> {
 }
 
 export function errorText(e: unknown): string {
-  if (e instanceof TypeError) return 'No connection to the server. Check your network and try again.'
-  return e instanceof Error ? e.message : String(e)
+  if (e instanceof TypeError) return t('No connection to the server. Check your network and try again.')
+  return t(e instanceof Error ? e.message : String(e)) // known server messages are translated
 }
 
 // ------------------------------------------------------------------ config (days, slots, app name)
@@ -45,9 +46,6 @@ const ConfigContext = createContext<Loaded<Config> | null>(null)
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const cfg = useLoad<Config>('/public/config')
-  useEffect(() => {
-    if (cfg.data?.app_name) document.title = cfg.data.app_name
-  }, [cfg.data?.app_name])
   return <ConfigContext.Provider value={cfg}>{children}</ConfigContext.Provider>
 }
 
@@ -92,14 +90,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={push}>
       {children}
       <div className="toasts" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={'toast' + (t.bad ? ' bad' : '')}>
-            <span>{t.text}</span>
+        {toasts.map((item) => (
+          <div key={item.id} className={'toast' + (item.bad ? ' bad' : '')}>
+            <span>{item.text}</span>
             <button
               className="btn btn-ghost btn-sm"
               style={{ color: 'inherit', minHeight: 0, padding: 0 }}
-              onClick={() => setToasts((all) => all.filter((x) => x.id !== t.id))}
-              aria-label="Dismiss"
+              onClick={() => setToasts((all) => all.filter((x) => x.id !== item.id))}
+              aria-label={t('Dismiss')}
             >
               ✕
             </button>
@@ -122,7 +120,7 @@ export function useNetwork() {
     const sync = () => setPending(pendingActions().length)
     const replay = async () => {
       const results = await replayQueue()
-      for (const r of results) toast(r.ok ? `Sent: ${r.action.label}` : `${r.action.label}: ${r.message}`, !r.ok)
+      for (const r of results) toast(r.ok ? t('Sent: {what}', { what: r.action.label }) : `${r.action.label}: ${t(r.message)}`, !r.ok)
       if (results.length) window.dispatchEvent(new Event('data-changed'))
     }
     const goOnline = () => {

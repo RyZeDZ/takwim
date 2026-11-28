@@ -1,4 +1,5 @@
 """Student-facing endpoints. No login, no personal data."""
+import os
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,7 +26,9 @@ def config(db: DB = Depends(get_db)):
             "week_start": rules.week_start(today).isoformat(),
             # The week to show by default: this one, or the next one once this week is over.
             "display_date": rules.default_search_range(today)[0].isoformat(),
-            "today_is_working_day": rules.is_working_day(today)}
+            "today_is_working_day": rules.is_working_day(today),
+            # Expected length of a generation, for the progress bar (the solver's time limit).
+            "solver_seconds": float(os.getenv("SOLVER_TIME_LIMIT", "10")) if os.getenv("SOLVER_MODULE") else 0.5}
 
 
 @router.get("/groups")

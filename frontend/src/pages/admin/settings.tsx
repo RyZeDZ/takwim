@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import type { GenerateResult, Kind, LogRow, Room, Rules, SettingsResponse } from '../../api/types'
 import { PageHead } from '../../components/Layout'
-import { ErrorBox, Loading } from '../../components/ui'
+import { ErrorBox, Icon, ListSkeleton, Loading } from '../../components/ui'
 import { errorText, useConfig, useLoad, useToast } from '../../lib/hooks'
-import { ROOM_TYPE } from '../public'
+import { locale, t } from '../../lib/i18n'
+import { dayName } from '../../lib/dates'
+import { roomType } from '../public'
 import { GenerateSummary } from './timetable'
 
 const WEEKDAYS = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
@@ -58,7 +60,7 @@ export function Settings() {
       setRules(r.rules)
       setOutcome(r)
       cfg.reload()
-      toast('Settings saved')
+      toast(t('Settings saved'))
     } catch (e) {
       toast(errorText(e), true)
     } finally {
@@ -77,19 +79,21 @@ export function Settings() {
 
   return (
     <div className="stack">
-      <PageHead title="Settings" intro="The department's rules. Changing the week or the group sizes regenerates the timetable right away, moving as few sessions as possible.">
+      <PageHead title={t('Settings')} intro={t("The department's rules. Changing the week or the group sizes regenerates the timetable right away, moving as few sessions as possible.")}>
         <button className="btn btn-primary" disabled={busy || !Object.keys(changes).length} onClick={save}>
           {busy && <span className="spinner" />}
-          {busy && reshaping ? 'Saving and regenerating…' : 'Save changes'}
+          {busy && reshaping ? t('Saving and regenerating…') : t('Save changes')}
         </button>
       </PageHead>
       {reshaping && !busy && (
-        <div className="callout callout-info">Saving these changes will regenerate the timetable (it takes a few seconds).</div>
+        <div className="callout callout-info">
+          <Icon name="info" /> {t('Saving these changes will regenerate the timetable (it takes a few seconds).')}
+        </div>
       )}
       {outcome && (
         <section className="panel stack-sm">
-          <h2>Saved</h2>
-          <p className="small muted">Changed: {outcome.changed.join(', ') || 'nothing'}</p>
+          <h2>{t('Saved')}</h2>
+          <p className="small muted">{t('Changed: {list}', { list: outcome.changed.join(', ') || t('nothing') })}</p>
           {outcome.notes.map((n) => (
             <div key={n} className="callout callout-warn">
               {n}
@@ -100,10 +104,10 @@ export function Settings() {
       )}
 
       <section className="panel stack-sm">
-        <h2>Week</h2>
+        <h2>{t('Week')}</h2>
         <div className="form-grid">
           <label className="field">
-            First day of the week
+            {t('First day of the week')}
             <select
               className="select"
               value={firstDay}
@@ -111,13 +115,13 @@ export function Settings() {
             >
               {WEEKDAYS.map((d) => (
                 <option key={d} value={d}>
-                  {cap(d)}
+                  {dayName(cap(d))}
                 </option>
               ))}
             </select>
           </label>
         </div>
-        <div className="row" role="group" aria-label="Working days">
+        <div className="row" role="group" aria-label={t('Working days')}>
           {orderFrom(firstDay, WEEKDAYS).map((d) => (
             <label key={d} className="check" style={{ marginRight: 12 }}>
               <input
@@ -131,15 +135,15 @@ export function Settings() {
                   })
                 }
               />
-              {cap(d)}
+              {dayName(cap(d))}
             </label>
           ))}
         </div>
       </section>
 
       <section className="panel stack-sm">
-        <h2>Time slots</h2>
-        <p className="small muted">Format 08:00-09:30, in order, without overlaps.</p>
+        <h2>{t('Time slots')}</h2>
+        <p className="small muted">{t('Format 08:00-09:30, in order, without overlaps.')}</p>
         <div className="stack-sm" style={{ gap: 8, maxWidth: 360 }}>
           {rules.time_slots.map((s, i) => (
             <div className="row" key={i}>
@@ -147,12 +151,12 @@ export function Settings() {
                 className="input"
                 style={{ flex: 1 }}
                 value={s}
-                aria-label={`Time slot ${i + 1}`}
+                aria-label={t('Time slot {n}', { n: i + 1 })}
                 onChange={(e) => setRules({ ...rules, time_slots: rules.time_slots.map((x, j) => (j === i ? e.target.value : x)) })}
               />
               <button
                 className="btn icon-btn btn-ghost"
-                aria-label={`Remove slot ${s}`}
+                aria-label={t('Remove slot {slot}', { slot: s })}
                 disabled={rules.time_slots.length <= 1}
                 onClick={() => setRules({ ...rules, time_slots: rules.time_slots.filter((_, j) => j !== i) })}
               >
@@ -165,17 +169,17 @@ export function Settings() {
             style={{ alignSelf: 'start' }}
             onClick={() => setRules({ ...rules, time_slots: [...rules.time_slots, nextSlot(rules.time_slots)] })}
           >
-            Add a slot
+            {t('Add a slot')}
           </button>
         </div>
       </section>
 
       <section className="panel stack-sm">
-        <h2>Limits and group sizes</h2>
+        <h2>{t('Limits and group sizes')}</h2>
         <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', alignItems: 'start' }}>
           {NUMBERS.map((n) => (
             <label key={n.key} className="field">
-              {n.label}
+              {t(n.label)}
               <input
                 className="input"
                 type="number"
@@ -184,26 +188,26 @@ export function Settings() {
                 onChange={(e) => setRules({ ...rules, [n.key]: Number(e.target.value) })}
               />
               <span className="tiny muted" style={{ fontWeight: 400 }}>
-                {n.hint}
+                {t(n.hint)}
               </span>
             </label>
           ))}
         </div>
         <label className="check">
           <input type="checkbox" checked={rules.split_tp_groups} onChange={(e) => setRules({ ...rules, split_tp_groups: e.target.checked })} />
-          Split TD groups into smaller TP subgroups (off: the whole TD group goes to the lab)
+          {t('Split TD groups into smaller TP subgroups (off: the whole TD group goes to the lab)')}
         </label>
       </section>
 
       <section className="panel stack-sm">
-        <h2>Which rooms for which classes</h2>
+        <h2>{t('Which rooms for which classes')}</h2>
         <div className="table-wrap">
           <table className="table" style={{ maxWidth: 560 }}>
             <thead>
               <tr>
                 <th></th>
-                {(['amphi', 'td', 'lab'] as Room['type'][]).map((t) => (
-                  <th key={t}>{ROOM_TYPE[t]}</th>
+                {(['amphi', 'td', 'lab'] as Room['type'][]).map((ty) => (
+                  <th key={ty}>{roomType(ty)}</th>
                 ))}
               </tr>
             </thead>
@@ -211,23 +215,23 @@ export function Settings() {
               {(['lecture', 'td', 'tp'] as Kind[]).map((k) => (
                 <tr key={k}>
                   <td>
-                    <strong>{KIND_LABEL[k]}</strong>
+                    <strong>{t(KIND_LABEL[k])}</strong>
                   </td>
-                  {(['amphi', 'td', 'lab'] as Room['type'][]).map((t) => {
-                    const on = rules.room_types_for[k].includes(t)
+                  {(['amphi', 'td', 'lab'] as Room['type'][]).map((ty) => {
+                    const on = rules.room_types_for[k].includes(ty)
                     return (
-                      <td key={t}>
+                      <td key={ty}>
                         <input
                           type="checkbox"
                           style={{ width: 18, height: 18, accentColor: 'var(--blue)' }}
                           checked={on}
-                          aria-label={`${KIND_LABEL[k]} in ${ROOM_TYPE[t]}`}
+                          aria-label={t('{kind} in {room}', { kind: t(KIND_LABEL[k]), room: roomType(ty) })}
                           onChange={() =>
                             setRules({
                               ...rules,
                               room_types_for: {
                                 ...rules.room_types_for,
-                                [k]: on ? rules.room_types_for[k].filter((x) => x !== t) : [...rules.room_types_for[k], t],
+                                [k]: on ? rules.room_types_for[k].filter((x) => x !== ty) : [...rules.room_types_for[k], ty],
                               },
                             })
                           }
@@ -243,10 +247,10 @@ export function Settings() {
       </section>
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button className="btn" disabled={busy} onClick={() => setRules(data.defaults)}>
-          Back to defaults
+          {t('Back to defaults')}
         </button>
         <button className="btn btn-primary" disabled={busy || !Object.keys(changes).length} onClick={save}>
-          Save changes
+          {t('Save changes')}
         </button>
       </div>
     </div>
@@ -271,30 +275,30 @@ export function Activity() {
   const logs = useLoad<LogRow[]>('/admin/logs?limit=200')
   return (
     <div className="stack">
-      <PageHead title="Activity" intro="Every action, who did it and when: imports, generations, absences, bookings." />
+      <PageHead title={t('Activity')} intro={t('Every action, who did it and when: imports, generations, absences, bookings.')} />
       {logs.error && <ErrorBox error={logs.error} onRetry={logs.reload} />}
-      {logs.loading && !logs.data && <Loading />}
+      {logs.loading && !logs.data && <div className="panel"><ListSkeleton /></div>}
       {logs.data && (
         <section className="panel panel-tight">
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>When</th>
-                  <th>Who</th>
-                  <th>Action</th>
-                  <th>Detail</th>
+                  <th>{t('When')}</th>
+                  <th>{t('Who')}</th>
+                  <th>{t('Action')}</th>
+                  <th>{t('Detail')}</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.data.map((l, i) => (
                   <tr key={i}>
                     <td className="num" style={{ whiteSpace: 'nowrap' }}>
-                      {new Date(l.at + 'Z').toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}
+                      {new Date(l.at + 'Z').toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                     <td>{l.user}</td>
                     <td>
-                      <span className="badge badge-neutral">{l.action.replace('_', ' ')}</span>
+                      <span className="badge badge-neutral">{t(l.action.replace('_', ' '))}</span>
                     </td>
                     <td className="small">{l.detail}</td>
                   </tr>
@@ -302,7 +306,7 @@ export function Activity() {
               </tbody>
             </table>
           </div>
-          {logs.data.length === 0 && <p className="muted small" style={{ padding: 20 }}>Nothing yet.</p>}
+          {logs.data.length === 0 && <p className="muted small" style={{ padding: 20 }}>{t('Nothing yet.')}</p>}
         </section>
       )}
     </div>

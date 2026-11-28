@@ -69,6 +69,71 @@ function sendFile(res, file) {
   createReadStream(file).pipe(res)
 }
 
+// ------------------------------------------------------------------ link previews
+// Apps that show link previews (WhatsApp, Telegram, Facebook...) read the page's <meta> tags
+// without running JavaScript. So the page is served with its own title, and full addresses.
+const INDEX = path.join(DIST, 'index.html')
+let groupNames = { at: 0, byId: new Map() }
+
+function fetchJson(pathname) {
+  return new Promise((resolve, reject) => {
+    const r = (API.protocol === 'https:' ? https : http).get(
+      { hostname: API.hostname, port: API.port || (API.protocol === 'https:' ? 443 : 80), path: pathname, timeout: 3000 },
+      (up) => {
+        let body = ''
+        up.on('data', (c) => (body += c))
+        up.on('end', () => {
+          try {
+            resolve(JSON.parse(body))
+          } catch (e) {
+            reject(e)
+          }
+        })
+      },
+    )
+    r.on('timeout', () => r.destroy(new Error('timeout')))
+    r.on('error', reject)
+  })
+}
+
+/** Group id -> name, refreshed at most once a minute. */
+async function groupName(id) {
+  if (Date.now() - groupNames.at > 60_000) {
+    const byId = new Map()
+    const walk = (n) => (byId.set(String(n.id), n.name), n.children.forEach(walk))
+    try {
+      for (const lv of await fetchJson('/public/groups')) lv.sections.forEach(walk)
+      groupNames = { at: Date.now(), byId }
+    } catch {
+      /* API unreachable: keep the generic preview */
+    }
+  }
+  return groupNames.byId.get(String(id))
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const setMeta = (html, attr, key, value) =>
+  html.replace(new RegExp(`(<meta ${attr}="${key}" content=")[^"]*(")`), `$1${esc(value)}$2`)
+
+async function sendIndex(req, res, url) {
+  const origin = `${req.headers['x-forwarded-proto'] || (tls ? 'https' : 'http')}://${req.headers.host}`
+  let html = readFileSync(INDEX, 'utf8')
+  const m = url.match(/^\/g\/(\d+)/)
+  const name = m && (await groupName(m[1]))
+  if (name) {
+    const title = `${name} · Timetable`
+    const text = `This week's classes for ${name}, always up to date: cancelled classes and extra sessions shown live. Works offline.`
+    html = html.replace(/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>`)
+    html = setMeta(html, 'property', 'og:title', title)
+    html = setMeta(html, 'property', 'og:description', text)
+    html = setMeta(html, 'name', 'description', text)
+  }
+  html = setMeta(html, 'property', 'og:url', origin + url)
+  html = setMeta(html, 'property', 'og:image', origin + '/og-image.png')
+  res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-cache' })
+  res.end(html)
+}
+
 function serveStatic(req, res) {
   let url
   try {
@@ -77,8 +142,8 @@ function serveStatic(req, res) {
     url = '/'
   }
   const file = path.normalize(path.join(DIST, url))
-  if (file.startsWith(DIST + path.sep) && existsSync(file) && statSync(file).isFile()) return sendFile(res, file)
-  sendFile(res, path.join(DIST, 'index.html')) // app routes like /g/12 (QR codes)
+  if (file !== INDEX && file.startsWith(DIST + path.sep) && existsSync(file) && statSync(file).isFile()) return sendFile(res, file)
+  sendIndex(req, res, url).catch(() => sendFile(res, INDEX)) // app routes like /g/12 (QR codes)
 }
 
 function proxy(req, res) {
