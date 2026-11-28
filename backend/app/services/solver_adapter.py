@@ -364,9 +364,13 @@ def generate(db: DB) -> dict:
 
     # Extra sessions already booked that now collide with the new timetable.
     tree = GroupTree.load(db)
+    # A class cancelled by an absence that day leaves its slot free: no overlap with it.
+    cancelled = {(a.session_id, a.date) for a in db.scalars(select(Absence).where(Absence.date >= today))}
     for c in db.scalars(select(Claim).where(Claim.date >= today)):
         di = rules.day_index(c.date)
         for s in new_sessions:
+            if (s.id, c.date) in cancelled:
+                continue
             if s.day == di and s.slot == c.slot and (
                     s.room_id == c.room_id or s.professor_id == c.professor_id
                     or s.group_id in tree.related(c.group_id)):

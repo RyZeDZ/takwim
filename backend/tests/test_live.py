@@ -224,3 +224,27 @@ def test_admin_week_views(client, admin, demo):
         r = client.get(f"/admin/week?scope={scope}&id={i}", headers=admin)
         assert r.status_code == 200 and r.json()["dates"]
     assert client.get("/admin/week?scope=room&id=99999", headers=admin).status_code == 404
+
+
+def test_extra_session_in_a_cancelled_slot_is_not_flagged(client, admin, demo):
+    """Prof B books the slot freed by Prof A's absence, for the same group; regenerating must not
+    report it as overlapping (the class it sits on is cancelled that day)."""
+    profs = _prof_sessions(client, demo)
+    for creds_a, prof_a, mine in profs:
+        for s in mine:
+            others = [h for c, h, ss in profs if c is not creds_a
+                      and any(x["group_id"] == s["group_id"] for x in ss)
+                      and not any((x["day"], x["slot"]) == (s["day"], s["slot"]) for x in ss)]
+            if others:
+                break
+        else:
+            continue
+        break
+    when = next_date_for_day(s["day"])
+    client.post("/me/absences", headers=prof_a, json={"session_id": s["session_id"], "date": when.isoformat()})
+    rooms = {r["name"]: r["id"] for r in client.get("/admin/rooms", headers=admin).json()}
+    r = client.post("/me/claims", headers=others[0], json={"group_id": s["group_id"], "room_id": rooms[s["room"]],
+                                                           "date": when.isoformat(), "slot": s["slot"]})
+    assert r.status_code == 201, r.text
+    again = client.post("/admin/timetable/generate", headers=admin).json()
+    assert again["saved"] and again["absences_kept"] == 1 and again["claims_to_review"] == []
