@@ -5,6 +5,7 @@
 """
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session as DB
 
 from ..auth import log, require_admin
@@ -61,7 +62,9 @@ async def preview(
         headers, rows = read_table(file.filename or "", content)
     except ImportError_ as e:
         raise HTTPException(422, str(e)) from e
-    result = map_columns(kind, headers)
+    # In a worker thread: the optional language model takes about a second and must not
+    # block the other requests meanwhile.
+    result = await run_in_threadpool(map_columns, kind, headers)
     if column_overrides:
         try:
             overrides = json.loads(column_overrides)
