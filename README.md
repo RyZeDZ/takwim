@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.png" alt="Department timetables: always up to date, clash-free, works offline" width="820">
+  <img src="docs/images/cover.png" alt="Department timetables: always up to date, clash-free, works offline" width="820">
 </p>
 
 <h1 align="center">Smart timetables for the department</h1>
