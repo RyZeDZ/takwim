@@ -32,3 +32,12 @@ The backend must allow this address in `CORS_ORIGINS` (`*` by default).
 - The service worker (vite-plugin-pwa) caches the app itself, so it opens with no network.
 
 Days and time slots are never hard-coded: every grid is drawn from `GET /public/config`.
+
+## Languages, theme
+
+- Every text on screen is written in English inside `t('...')` (`src/lib/i18n.tsx`); the French
+  and Arabic versions are in `src/lib/translations.ts`, keyed by the English text. A missing
+  translation shows the English text. Placeholders: `t('{n} rooms', { n })`.
+- Arabic switches the page to right-to-left; layout uses logical CSS properties
+  (`margin-inline-start`...). Times and ranges stay left-to-right (`ltr()` in `src/lib/dates.ts`).
+- Dark mode follows the device, or the switch in the header (`data-theme` on `<html>`).
