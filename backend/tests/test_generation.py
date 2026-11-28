@@ -18,7 +18,7 @@ def test_generate_needs_data_and_builds_groups_itself(client, admin):
     assert client.post("/admin/timetable/generate", headers=admin).status_code == 400
     client.post("/admin/demo/seed", headers=admin)
     r = client.post("/admin/timetable/generate", headers=admin).json()
-    assert len(r["groups_rebuilt_for"]) == 6 and r["saved"]
+    assert len(r["groups_rebuilt_for"]) == 8 and r["saved"]
     again = client.post("/admin/timetable/generate", headers=admin).json()
     assert again["groups_rebuilt_for"] == [] and again["sessions_moved"] == 0  # stable
 

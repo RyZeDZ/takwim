@@ -1,7 +1,7 @@
 def test_groups_are_built_from_headcounts(client, admin):
     assert client.post("/admin/demo/seed", headers=admin).status_code == 200
     r = client.post("/admin/groups/build", headers=admin).json()
-    assert len(r["rebuilt"]) == 6
+    assert len(r["rebuilt"]) == 8
     levels = r["levels"]
     l1 = next(x for x in levels if x["level"] == "L1 CS")
     section = l1["sections"][0]
@@ -16,7 +16,7 @@ def test_groups_are_built_from_headcounts(client, admin):
 def test_stats_and_logs(client, admin):
     client.post("/admin/demo/seed", headers=admin)
     stats = client.get("/admin/stats", headers=admin).json()
-    assert stats["levels"] == 6 and stats["rooms_active"] == 21 and stats["professors"] >= 15
+    assert stats["levels"] == 8 and stats["rooms_active"] == 21 and stats["professors"] >= 15
     assert stats["sessions_per_week"] == 0
     actions = [x["action"] for x in client.get("/admin/logs", headers=admin).json()]
     assert "demo_seed" in actions
@@ -29,7 +29,7 @@ def test_groups_rebuild_only_what_changed(client, admin):
     lv = next(x for x in client.get("/admin/levels", headers=admin).json() if x["name"] == "M1 AI")
     client.patch(f"/admin/levels/{lv['id']}", headers=admin, json={"name": "M1 AI", "headcount": 70})
     assert client.post("/admin/groups/build", headers=admin).json()["rebuilt"] == ["M1 AI"]
-    assert len(client.post("/admin/groups/build?force=true", headers=admin).json()["rebuilt"]) == 6
+    assert len(client.post("/admin/groups/build?force=true", headers=admin).json()["rebuilt"]) == 8
 
 
 def test_demo_data_never_overwrites_real_data(client, admin, monkeypatch):

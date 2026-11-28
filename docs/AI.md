@@ -43,11 +43,11 @@ Safety net: if the search ends with fewer sessions placed than the greedy start,
 timetable is used. Then the backend re-checks every hard rule (`find_conflicts`) and refuses to
 save anything invalid; if the solver crashes, the built-in one runs and a warning is shown.
 
-**Measured** (`ai/benchmark.py`, demo department, 172 sessions, greedy → CP-SAT over several
-runs): 0 clashes for both; empty slots that are not a needed break, per group per week 0.61 →
-0.39–0.50; classes beyond 3 in a row 11 → 6–9; one-class days 6 → 0–3; TD / TP before its
-lecture 5 → 1–2; after closing a busy room, only the sessions that were in it move (plus one or
-two); ~10 s; server peak ~470 MB. A break counts as one when the classes on both sides add up to
+**Measured** (`ai/benchmark.py`, demo department: 8 levels, 29 groups, 22 professors, 21 rooms,
+195 sessions; greedy → CP-SAT): 0 clashes for both; empty slots that are not a needed break, per
+group per week 0.48 → 0.33; classes beyond 3 in a row 13 → 9; one-class days 9 → 1; TD / TP
+before its lecture 6 → 4; after closing a busy room, only the sessions that were in it move (plus
+one or two); ~10 s; server peak ~530 MB. A break counts as one when the classes on both sides add up to
 more than the limit. Given 30 s instead of 10, CP-SAT gets down to about 1 class beyond 3 in a row.
 
 **Why not a chatbot / neural network?** They cannot guarantee zero clashes; a solver proves every

@@ -55,7 +55,7 @@ Automated coverage already in place: `cd backend && pytest -q` (47 tests) and
 
 ## C. Admin: generation, timetable, settings
 
-- [ ] C1 Generate on the demo → 172/172 placed, 0 clashes, time ≈ 10 s, gaps shown.
+- [ ] C1 Generate on the demo → 195/195 placed, 0 clashes, time ≈ 10 s, gaps shown.
 - [ ] C2 Generate again with no change → 0 sessions moved.
 - [ ] C3 Unplaceable data (e.g. a module whose only professor has max 1 session, or a TP with
       no lab big enough) → saved with a list "could not be placed" and the reason.

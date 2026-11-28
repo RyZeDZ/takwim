@@ -99,7 +99,7 @@ def main():
 
     # 1. Levels (Excel): year and speciality in two columns, plus the long name.
     long = {"CS": "Informatique (tronc commun)", "ISIL": "Ingénierie des SI et du Logiciel",
-            "SI": "Systèmes Informatiques", "AI": "Intelligence Artificielle"}
+            "SI": "Systèmes Informatiques", "AI": "Intelligence Artificielle", "SEC": "Cybersécurité"}
     excel(OUT / "1_niveaux.xlsx", "Effectifs par niveau",
           ["Année", "Spécialité", "Intitulé de la formation", "Effectif"],
           [[*split_level(lv.name), f"{split_level(lv.name)[0]} {long.get(split_level(lv.name)[1], '')}".strip(),

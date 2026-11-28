@@ -43,6 +43,12 @@ LEVELS = {
         "Optimization": (1, 1, 0), "Natural Language Processing": (1, 0, 1)}),
     "M2 AI": (30, {
         "Deep Learning": (1, 0, 1), "Project Methodology": (0, 1, 0), "AI Ethics": (1, 0, 0)}),
+    "M1 SEC": (35, {
+        "Applied Cryptography": (1, 1, 1), "Network Security": (1, 1, 1),
+        "Secure Software Development": (1, 0, 1), "Security Auditing & Standards": (1, 1, 0)}),
+    "M2 SEC": (28, {
+        "Penetration Testing": (1, 0, 1), "Digital Forensics": (1, 0, 1),
+        "Cloud & IoT Security": (1, 1, 0), "Research Methodology": (0, 1, 0)}),
 }
 
 ROOMS = (
@@ -58,7 +64,8 @@ PROF_NAMES = [
     "Mehdi Benyahia", "Sarah Khelifi", "Nabil Ouali", "Asma Djebbar", "Tarek Hadj",
     "Yasmine Larbi", "Hichem Saidi", "Kenza Mebarki", "Bilal Aouadi", "Rym Bensaid",
     "Anis Guerfi", "Selma Rezki", "Zakaria Mokrani", "Leila Boukhari", "Islem Naceur",
-    "Ines Taleb", "Riad Boudjema",
+    "Ines Taleb", "Riad Boudjema", "Chahinez Ait Ali", "Mounir Zitouni", "Sabrina Hamidi",
+    "Adel Benamara", "Nesrine Kherbache", "Hamza Belkacem", "Amira Sellami", "Yanis Ouchene",
 ]  # invented names
 
 
