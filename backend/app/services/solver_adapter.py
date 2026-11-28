@@ -8,7 +8,8 @@ CONTRACT: solve(data) -> result, plain dicts only.
 data = {
   "days":  ["Sunday", ...],                "slots": ["08:00-09:30", ...],
   "room_types_for": {"lecture": ["amphi", "td"], "td": ["td"], "tp": ["lab"]},
-  "options": {"max_sessions_per_day_group": 4, "max_sessions_per_day_prof": 4},
+  "options": {"max_sessions_per_day_group": 4, "max_sessions_per_day_prof": 4,
+              "max_in_a_row": 3},                          # soft: break after 3 in a row
   "rooms":      [{"id", "name", "type", "capacity"}],           # open rooms only
   "groups":     [{"id", "name", "kind", "size", "parent_id"}],  # TP ⊂ TD ⊂ section
   "professors": [{"id", "name", "max_sessions",                 # max sessions per week
@@ -89,7 +90,8 @@ def build_input(db: DB) -> dict:
         "slots": rules.time_slots,
         "room_types_for": rules.room_types_for,
         "options": {"max_sessions_per_day_group": rules.max_sessions_per_day_per_group,
-                    "max_sessions_per_day_prof": rules.max_sessions_per_day_per_professor},
+                    "max_sessions_per_day_prof": rules.max_sessions_per_day_per_professor,
+                    "max_in_a_row": rules.max_sessions_in_a_row},
         "rooms": [{"id": r.id, "name": r.name, "type": r.type, "capacity": r.capacity}
                   for r in db.scalars(select(Room).where(Room.active.is_(True)).order_by(Room.id))],
         "groups": [{"id": g.id, "name": g.name, "kind": g.kind, "size": g.size,

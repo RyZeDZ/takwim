@@ -22,7 +22,11 @@ How it works, in short:
       - sessions moved compared with the current timetable (fewest changes after a re-solve),
       - empty slots between two classes in a group's day (gaps),
       - professors' "I'd rather not" slots and lower choices in their wish list,
-      - the same module twice on the same day for a group, the last slot of the day.
+      - the same module twice on the same day for a group, the last slot of the day,
+      - more than `max_in_a_row` sessions back to back without a break (groups and professors),
+      - a day with a single class (students come in for one session),
+      - a day that does not start in the first slot,
+      - a TD / TP placed before its lecture on the same day.
   * The search starts from the current timetable (or from the fast built-in greedy result)
     and improves it until the time limit. The result is re-checked by the backend.
 
@@ -39,10 +43,15 @@ from ortools.sat.python import cp_model
 WEIGHTS = {
     "unscheduled": 1000,  # a session left out of the timetable
     "moved": 20,          # a session moved compared with the current timetable
+    "in_a_row": 8,        # one session over the "in a row" limit without a break
+                          # (above "gap", so 2 + break + 2 beats 4 back to back)
     "gap": 6,             # one empty slot between two classes of a group, in one day
     "avoid": 5,           # a session in a professor's "I'd rather not" slot
     "rank": 3,            # per session, per step down the professor's wish list
+    "single_day": 4,      # a day with only one class for a group
     "same_day": 3,        # the same module twice on the same day for a group
+    "late_start": 2,      # a group's day that does not start in the first slot
+    "lecture_after": 2,   # a TD / TP before its lecture on the same day
     "late": 1,            # a session in the last slot of the day
     "room_type": 1,       # a second-choice room type (e.g. a lecture in a TD room)
 }
@@ -78,6 +87,7 @@ def solve(data: dict) -> dict:
     options = data.get("options", {})
     max_group_day = options.get("max_sessions_per_day_group", n_slots)
     max_prof_day = options.get("max_sessions_per_day_prof", n_slots)
+    max_in_a_row = options.get("max_in_a_row", n_slots)
 
     profs = {p["id"]: p for p in data["professors"]}
     unavailable = {(p["id"], d, s) for p in data["professors"] for d, s in p.get("unavailable", [])}
@@ -193,6 +203,21 @@ def solve(data: dict) -> dict:
         if len(vs) > max_prof_day:
             model.Add(sum(vs) <= max_prof_day)
 
+    def no_long_runs(occupied):
+        """Penalise every window of max_in_a_row + 1 consecutive slots that are all taken."""
+        for start in range(len(occupied) - max_in_a_row):
+            window = occupied[start:start + max_in_a_row + 1]
+            if any(isinstance(o, int) for o in window):  # a slot that is always free
+                continue
+            over = model.NewBoolVar("")
+            model.Add(over >= sum(window) - max_in_a_row)
+            penalties.append(WEIGHTS["in_a_row"] * over)
+
+    for p in profs:
+        for d in range(n_days):
+            no_long_runs([sum(by_prof[p, d * n_slots + s]) if by_prof[p, d * n_slots + s] else 0
+                          for s in range(n_slots)])
+
     # Students: for each smallest group, its own sessions + its ancestors' sessions.
     reqs_of_group = defaultdict(list)
     for r in reqs:
@@ -231,6 +256,32 @@ def solve(data: dict) -> dict:
             gaps = model.NewIntVar(0, n_slots, "")
             model.Add(gaps >= last - first + 1 - count - n_slots * (1 - busy))
             penalties.append(WEIGHTS["gap"] * gaps)
+            no_long_runs(occupied)
+            single = model.NewBoolVar("")  # 1 when the day has exactly one class
+            model.Add(single >= 2 * busy - count)
+            penalties.append(WEIGHTS["single_day"] * single)
+            penalties.append(WEIGHTS["late_start"] * (busy - occupied[0]))  # busy >= first slot
+
+    # A TD / TP should not come before its lecture on the same day.
+    def at(rid, ti):
+        return sum(occ.get((rid, ti), []))
+
+    lectures = defaultdict(list)  # (module, group) -> lecture requirement ids
+    for r in reqs:
+        if r["kind"] == "lecture":
+            lectures[r["module_id"], r["group_id"]].append(r["id"])
+    for r in reqs:
+        if r["kind"] == "lecture":
+            continue
+        for lec in [lid for g in chain(r["group_id"])[1:] for lid in lectures[r["module_id"], g]]:
+            bad = model.NewBoolVar("")
+            for d in range(n_days):
+                for i in range(n_slots - 1):
+                    here = occ.get((r["id"], d * n_slots + i))
+                    later = [v for j in range(i + 1, n_slots) for v in occ.get((lec, d * n_slots + j), [])]
+                    if here and later:
+                        model.Add(bad >= at(r["id"], d * n_slots + i) + sum(later) - 1)
+            penalties.append(WEIGHTS["lecture_after"] * bad)
 
     # The same module twice on one day for a group: spread it over the week.
     for items in bundles.values():

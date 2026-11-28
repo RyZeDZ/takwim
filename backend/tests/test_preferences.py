@@ -40,3 +40,46 @@ def test_rank_is_kept_and_editable(client, admin):
                                          {"module_id": m1["id"], "rank": 1}]}).json()
     assert [t["module_id"] for t in p["teaches"]] == [m1["id"], m2["id"]]
     assert [t["rank"] for t in p["teaches"]] == [1, 2]
+
+
+def test_in_a_row_setting_reaches_the_solver(client, admin, demo):
+    from app.services.solver_adapter import build_input
+
+    r = client.put("/admin/settings", headers=admin, json={"max_sessions_in_a_row": 2}).json()
+    assert r["changed"] == ["max_sessions_in_a_row"]
+    with SessionLocal() as db:
+        assert build_input(db)["options"]["max_in_a_row"] == 2
+    assert client.put("/admin/settings", headers=admin,
+                      json={"max_sessions_in_a_row": 0}).status_code == 422
+
+
+def test_cpsat_leaves_a_break_after_the_limit(monkeypatch):
+    """One group, four classes, one day: with at most 3 in a row the solver leaves a break."""
+    import pytest
+    pytest.importorskip("ortools")
+    from app.plugins import REPO_ROOT
+
+    monkeypatch.syspath_prepend(str(REPO_ROOT))
+    from ai import solver
+
+    monkeypatch.setenv("SOLVER_TIME_LIMIT", "5")
+    monkeypatch.setattr(solver, "_greedy_start", lambda data: [])
+    data = {
+        "days": ["Sunday"], "slots": [f"s{i}" for i in range(6)],
+        "room_types_for": {"lecture": ["td"], "td": ["td"], "tp": ["lab"]},
+        "options": {"max_sessions_per_day_group": 4, "max_sessions_per_day_prof": 6, "max_in_a_row": 3},
+        "rooms": [{"id": 1, "name": "R1", "type": "td", "capacity": 40}],
+        "groups": [{"id": 1, "name": "G1", "kind": "td", "size": 30, "parent_id": None}],
+        "professors": [{"id": p, "name": f"P{p}", "max_sessions": 6, "unavailable": [], "avoid": []}
+                       for p in range(1, 5)],
+        "can_teach": [{"prof_id": p, "module_id": p, "kinds": ["td"], "rank": 1} for p in range(1, 5)],
+        "requirements": [{"id": i, "module_id": i, "module": f"M{i}", "group_id": 1, "kind": "td", "size": 30}
+                         for i in range(1, 5)],
+        "previous": [],
+    }
+    slots = sorted(a["slot"] for a in solver.solve(data)["assignments"])
+    assert len(slots) == 4
+    runs = [1]
+    for a, b in zip(slots, slots[1:]):
+        runs.append(runs[-1] + 1 if b == a + 1 else 1)
+    assert max(runs) <= 3

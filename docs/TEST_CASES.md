@@ -5,7 +5,7 @@ web app (`cd frontend && npm run dev`). Admin login: `ADMIN_USERNAME` / `ADMIN_P
 `backend/.env`. Professor logins: shown once after "Load demo department" (copy them), or
 Professors → "New password". Test each section on a computer **and** on a phone.
 
-Automated coverage already in place: `cd backend && pytest -q` (45 tests) and
+Automated coverage already in place: `cd backend && pytest -q` (47 tests) and
 `python scripts/demo_cases.py` (the 3 jury cases).
 
 ## A. Jury cases (rehearse these first)
@@ -70,6 +70,8 @@ Automated coverage already in place: `cd backend && pytest -q` (45 tests) and
       the usual days × slots layout.
 - [ ] C11 Settings: change max sessions per day per professor → Save (no regeneration) →
       Generate → no professor above the limit.
+- [ ] C11b Settings: "Sessions in a row before a break" = 2 → Generate → most groups get a free
+      slot after 2 classes (preferred, not strict: a few runs of 3 can remain).
 - [ ] C12 Settings: add Saturday as a working day → saved and the timetable regenerates; grids
       everywhere show Saturday. Change the first day of the week.
 - [ ] C13 Settings: add / remove / edit a time slot; invalid format or overlapping slot → error.

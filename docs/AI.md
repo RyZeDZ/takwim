@@ -32,7 +32,10 @@ Leaving a session out (1000 — so it only happens when truly impossible, with t
 reported); moving a session compared with the current timetable (20); each empty slot between
 two classes in a group's day (6); a "rather not" slot (5); each step down a professor's wish
 list (3); the same module twice the same day for a group (3); the last slot of the day (1);
-a second-choice room type (1). The weights are at the top of `ai/solver.py`.
+a second-choice room type (1); each class beyond `max_sessions_in_a_row` back to back, for a
+group or a professor (8, above the gap weight so that 2 + break + 2 beats 4 in a row); a day with
+a single class (4); a day that does not start in the first slot (2); a TD / TP before its lecture
+on the same day (2). The weights are at the top of `ai/solver.py`.
 
 **The search.** It starts from the built-in greedy solver's timetable (valid, found in 0.02 s)
 and improves it for `SOLVER_TIME_LIMIT` seconds (10 by default) on `SOLVER_WORKERS` threads (4).
@@ -40,9 +43,12 @@ Safety net: if the search ends with fewer sessions placed than the greedy start,
 timetable is used. Then the backend re-checks every hard rule (`find_conflicts`) and refuses to
 save anything invalid; if the solver crashes, the built-in one runs and a warning is shown.
 
-**Measured** (`ai/benchmark.py`, demo department, 172 sessions): 0 clashes for both; gaps per
-group per week 0.67 (greedy) → 0.28–0.44 (CP-SAT); after closing a busy room, only the sessions
-that were in it move; ~10 s; server peak ~460 MB.
+**Measured** (`ai/benchmark.py`, demo department, 172 sessions, greedy → CP-SAT over several
+runs): 0 clashes for both; empty slots that are not a needed break, per group per week 0.61 →
+0.39–0.50; classes beyond 3 in a row 11 → 6–9; one-class days 6 → 0–3; TD / TP before its
+lecture 5 → 1–2; after closing a busy room, only the sessions that were in it move (plus one or
+two); ~10 s; server peak ~470 MB. A break counts as one when the classes on both sides add up to
+more than the limit. Given 30 s instead of 10, CP-SAT gets down to about 1 class beyond 3 in a row.
 
 **Why not a chatbot / neural network?** They cannot guarantee zero clashes; a solver proves every
 rule holds, and can explain why a session could not be placed.

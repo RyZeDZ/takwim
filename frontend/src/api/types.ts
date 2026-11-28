@@ -142,6 +142,7 @@ export interface Rules {
   time_slots: string[]
   max_sessions_per_day_per_group: number
   max_sessions_per_day_per_professor: number
+  max_sessions_in_a_row: number
   section_max_size: number
   td_group_size: number
   tp_group_size: number

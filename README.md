@@ -44,16 +44,22 @@ Laptop: AMD Ryzen 7 6800H, 16 GB RAM; the solver uses 4 CPU threads.
 | --- | --- | --- |
 | Sessions placed | 172 / 172 | 172 / 172 |
 | Clashes | 0 | 0 |
-| Empty slots between classes, per group per week | 0.67 | **0.28 to 0.44** (−35 to −58 %, over several runs) |
+| Empty slots between classes that are not a needed break, per group per week | 0.61 | **0.39 to 0.50** |
+| Classes beyond 3 in a row with no break (whole department, per week) | 11 | **6 to 9** |
+| Days with a single class (students come in for one session) | 6 | **0 to 3** |
+| TD / TP placed before its lecture on the same day | 5 | **1 to 2** |
 | Sessions moved when a busy room closes | only the ones in that room | only the ones in that room |
 | Time to generate | 0.02 s | 10 s (time limit, adjustable) |
+
+AI solver ranges are over several runs. After 3 classes in a row the solver tries to leave a
+free slot (the admin sets the number in Settings).
 
 - **Messy headers:** on 10 test files written like department files (40 columns to recognise),
   the dictionary alone gets **68 %** right; with the language model, **88 %** (1 wrong
   suggestion, caught in the preview), about 1.3 s per file.
 - **Memory:** the server peaks at about 460 MB while generating; about 1.9 GB once the
   language model is loaded for an import. **Model size on disk:** 1.1 GB. No internet needed.
-- Extra-session search: under a second. All 45 automated tests pass.
+- Extra-session search: under a second. All 47 automated tests pass.
 
 ## Try it
 

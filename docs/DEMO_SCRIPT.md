@@ -93,4 +93,4 @@ Shortcut for the other clips: Dashboard → **Load demo department** → Generat
 | 0:40–1:05 | Clip 1, fast-forwarded: files → preview → Generate → 172 sessions, 0 clashes, 10 s. |
 | 1:05–1:20 | Clip 2: room closed → only its sessions move. |
 | 1:20–1:45 | Clip 4: absence → Cancelled → Extra session → Freed room → Book → New session. |
-| 1:45–2:00 | Phone offline + numbers on screen: *"0 clashes, 35 to 58 % fewer gaps, 460 MB of RAM, works offline. Ready to test in the department."* |
+| 1:45–2:00 | Phone offline + numbers on screen: *"0 clashes, a break after 3 classes in a row, 470 MB of RAM, works offline. Ready to test in the department."* |

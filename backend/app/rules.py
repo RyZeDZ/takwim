@@ -52,6 +52,7 @@ class Rules:
     split_tp_groups: bool = False  # off: the TD group does the TP together
     default_max_sessions_per_professor: int = 12
     max_sessions_per_day_per_professor: int = 4
+    max_sessions_in_a_row: int = 3  # soft: a break is preferred after this many back-to-back
     room_types_for: dict[str, list[str]] = field(
         default_factory=lambda: {
             "lecture": ["amphi", "td"],
@@ -150,6 +151,7 @@ def validate(data: dict) -> list[str]:
         "tp_group_size",
         "default_max_sessions_per_professor",
         "max_sessions_per_day_per_professor",
+        "max_sessions_in_a_row",
     ):
         if not isinstance(data[key], int) or data[key] < 1:
             errors.append(f"{key} must be a whole number >= 1")

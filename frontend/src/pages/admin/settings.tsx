@@ -13,6 +13,7 @@ const KIND_LABEL: Record<Kind, string> = { lecture: 'Lectures', td: 'TD', tp: 'T
 const NUMBERS: { key: keyof Rules; label: string; hint: string }[] = [
   { key: 'max_sessions_per_day_per_group', label: 'Max sessions per day, per group', hint: 'Students never have more classes than this in one day.' },
   { key: 'max_sessions_per_day_per_professor', label: 'Max sessions per day, per professor', hint: 'A professor never teaches more than this in one day.' },
+  { key: 'max_sessions_in_a_row', label: 'Sessions in a row before a break', hint: 'Preferred, not strict: after this many back-to-back classes, the timetable tries to leave a free slot.' },
   { key: 'default_max_sessions_per_professor', label: 'Default max sessions per week, per professor', hint: 'Used when a professor has no personal maximum.' },
   { key: 'section_max_size', label: 'Max students per section', hint: 'A section attends lectures together.' },
   { key: 'td_group_size', label: 'Students per TD group', hint: 'Target size of a TD group.' },
