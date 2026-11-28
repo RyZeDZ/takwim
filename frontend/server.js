@@ -110,6 +110,8 @@ const handler = (req, res) => ((req.url || '').startsWith('/api/') ? proxy(req, 
 const cert = env.TLS_CERT && path.resolve(HERE, env.TLS_CERT)
 const key = env.TLS_KEY && path.resolve(HERE, env.TLS_KEY)
 const tls = cert && key && existsSync(cert) && existsSync(key)
+if (!cert || !key) console.warn('No TLS_CERT / TLS_KEY in frontend/.env: serving plain HTTP')
+else if (!tls) console.warn(`Certificate not found (${existsSync(cert) ? '' : cert + ' '}${existsSync(key) ? '' : key}): serving plain HTTP`)
 const server = tls
   ? https.createServer({ cert: readFileSync(cert), key: readFileSync(key) }, handler)
   : http.createServer(handler)
