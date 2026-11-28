@@ -1,15 +1,19 @@
 """Admin: build groups, generate the timetable, check it, move sessions by hand."""
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
 
 from ..auth import log, require_admin
 from ..db import get_db
-from ..models import Level, Professor, Room, Session
+from ..models import Group, Level, Professor, Room, Session
 from ..rules import get_rules
 from ..schemas import SessionPatch
 from ..services import solver_adapter
 from ..services.groups import build_groups, existing_structure
+from ..services.live import week_view
 from .common import get_or_404
 
 router = APIRouter(prefix="/admin", tags=["admin: timetable"], dependencies=[Depends(require_admin)])
@@ -51,6 +55,16 @@ def check(db: DB = Depends(get_db)):
     """Re-check the saved timetable against every hard rule."""
     conflicts = solver_adapter.current_conflicts(db)
     return {"conflicts": conflicts, "ok": not conflicts}
+
+
+@router.get("/week")
+def any_week(scope: Literal["group", "prof", "room"], id: int, day: date | None = Query(None, alias="date"),
+             db: DB = Depends(get_db)):
+    """The live week of one group, professor or room (same shape as /public/groups/{id}/week)."""
+    model = {"group": Group, "prof": Professor, "room": Room}[scope]
+    get_or_404(db, model, id)
+    key = {"group": "group_id", "prof": "prof_id", "room": "room_id"}[scope]
+    return week_view(db, any_date=day or date.today(), **{key: id})
 
 
 @router.patch("/sessions/{session_id}")

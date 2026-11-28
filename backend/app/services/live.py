@@ -149,7 +149,7 @@ def find_slots(db: DB, prof_id: int, group_id: int, date_from: date, date_to: da
 
 
 def week_view(db: DB, *, group_id: int | None = None, prof_id: int | None = None,
-              any_date: date) -> dict:
+              room_id: int | None = None, any_date: date) -> dict:
     """The live week: weekly sessions + Cancelled badges (absences) + New session badges (claims)."""
     rules = get_rules(db)
     tree = GroupTree.load(db)
@@ -159,6 +159,9 @@ def week_view(db: DB, *, group_id: int | None = None, prof_id: int | None = None
         gids = tree.related(group_id)
         sess_q = select(Session).where(Session.group_id.in_(gids))
         claim_q = select(Claim).where(Claim.group_id.in_(gids))
+    elif room_id is not None:
+        sess_q = select(Session).where(Session.room_id == room_id)
+        claim_q = select(Claim).where(Claim.room_id == room_id)
     else:
         sess_q = select(Session).where(Session.professor_id == prof_id)
         claim_q = select(Claim).where(Claim.professor_id == prof_id)

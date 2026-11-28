@@ -215,3 +215,12 @@ def test_regenerate_keeps_upcoming_absences(client, admin, demo):
     assert len(absences) == 1 and absences[0]["date"] == when.isoformat()
     week = client.get(f"/public/groups/{s['group_id']}/week?date={when}").json()
     assert any(e["status"] == "cancelled" and e["module"] == s["module"] for e in week["entries"])
+
+
+def test_admin_week_views(client, admin, demo):
+    room = client.get("/admin/rooms", headers=admin).json()[0]
+    prof = client.get("/admin/professors", headers=admin).json()[0]
+    for scope, i in (("room", room["id"]), ("prof", prof["id"])):
+        r = client.get(f"/admin/week?scope={scope}&id={i}", headers=admin)
+        assert r.status_code == 200 and r.json()["dates"]
+    assert client.get("/admin/week?scope=room&id=99999", headers=admin).status_code == 404
