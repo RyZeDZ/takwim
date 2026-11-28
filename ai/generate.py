@@ -527,7 +527,7 @@ def chain(g, by_id):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Generate a synthetic department for Takwim")
+    ap = argparse.ArgumentParser(description="Generate a synthetic department")
     ap.add_argument("--size", choices=SIZES, default="real")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="out")
