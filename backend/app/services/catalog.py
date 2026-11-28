@@ -1,4 +1,6 @@
 """Create / update rooms, levels, modules and professors (used by the forms and the importer)."""
+import re
+
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session as DB
@@ -80,8 +82,7 @@ def commit_rows(db: DB, kind: str, rows: list[dict]) -> dict:
                 db.add(Level(name=name, headcount=int(hc)))
                 created += 1
         elif kind == "modules":
-            level = db.scalar(select(Level).where(func.lower(Level.name) ==
-                                                   str(row.get("level", "")).strip().lower()))
+            level = find_level(db, row.get("level"))
             if not level:
                 warnings.append(f"row {n}: level '{row.get('level')}' not found "
                                 f"(import levels first), module '{name}' skipped")
@@ -108,10 +109,18 @@ def commit_rows(db: DB, kind: str, rows: list[dict]) -> dict:
                 credentials.append({"name": name, "username": username, "password": password})
                 created += 1
             kinds = [k for k in str(row.get("kinds") or "lecture,td,tp").split(",") if k]
-            # The wish list is in order of preference: first module = first choice.
-            for rank, mod_name in enumerate(row.get("modules") or [], start=1):
-                mods = list(db.scalars(select(Module).where(
-                    func.lower(Module.name) == mod_name.strip().lower())))
+            mod_names = row.get("modules") or []
+            if isinstance(mod_names, str):
+                mod_names = [m.strip() for m in re.split(r"[;,/\n]+", mod_names) if m.strip()]
+            level = find_level(db, row.get("level")) if row.get("level") else None
+            # The wish list is in order of preference: first module = first choice, unless the
+            # file has its own "order of preference" column (one wish per row).
+            first = int(row["rank"]) if str(row.get("rank") or "").isdigit() else 1
+            for rank, mod_name in enumerate(mod_names, start=first):
+                q = select(Module).where(func.lower(Module.name) == mod_name.strip().lower())
+                if level:
+                    q = q.where(Module.level_id == level.id)
+                mods = list(db.scalars(q))
                 if not mods:
                     warnings.append(f"row {n}: module '{mod_name}' not found for {name} "
                                     f"(import modules first)")
@@ -121,6 +130,18 @@ def commit_rows(db: DB, kind: str, rows: list[dict]) -> dict:
     db.commit()
     return {"created": created, "updated": updated, "skipped": skipped,
             "warnings": warnings, "credentials": credentials}
+
+
+def _key(name) -> str:
+    """'M1-RES', 'm1 res', 'M1 RES' -> 'm1 res' (to match level names written differently)."""
+    return " ".join(re.sub(r"[^0-9a-z]+", " ", str(name or "").lower()).split())
+
+
+def find_level(db: DB, name) -> Level | None:
+    key = _key(name)
+    if not key:
+        return None
+    return next((lv for lv in db.scalars(select(Level)) if _key(lv.name) == key), None)
 
 
 def save_availability(db: DB, prof_id: int, body) -> dict:

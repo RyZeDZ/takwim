@@ -12,6 +12,9 @@ import re
 import unicodedata
 from difflib import SequenceMatcher
 
+YEAR = {"required": False, "syn": ["annee", "year", "annee d etude", "السنة"]}
+SPECIALITY = {"required": False, "syn": ["specialite", "speciality", "filiere", "option", "التخصص"]}
+
 FIELDS: dict[str, dict[str, dict]] = {
     "rooms": {
         "name": {
@@ -45,18 +48,22 @@ FIELDS: dict[str, dict[str, dict]] = {
         },
     },
     "levels": {
+        # The level's name, e.g. "L3 ISIL". Files often split it into a year column and a
+        # speciality column: then the name is built from both (see clean_rows).
         "name": {
-            "required": True,
+            "required": False,
             "syn": [
                 "niveau",
                 "level",
                 "promotion",
-                "annee",
-                "specialite",
                 "parcours",
+                "formation",
+                "intitule de la formation",
                 "المستوى",
             ],
         },
+        "year": YEAR,
+        "speciality": SPECIALITY,
         "headcount": {
             "required": True,
             "syn": [
@@ -73,17 +80,18 @@ FIELDS: dict[str, dict[str, dict]] = {
     },
     "modules": {
         "level": {
-            "required": True,
+            "required": False,
             "syn": [
                 "niveau",
                 "level",
                 "promotion",
-                "annee",
                 "parcours",
-                "specialite",
+                "formation",
                 "المستوى",
             ],
         },
+        "year": YEAR,
+        "speciality": SPECIALITY,
         "name": {
             "required": True,
             "syn": [
@@ -129,7 +137,17 @@ FIELDS: dict[str, dict[str, dict]] = {
                 "charge horaire",
                 "max",
                 "max sessions",
+                "charge max",
             ],
+        },
+        # One wish per row (fiche de voeux): its order of preference and its level.
+        "rank": {
+            "required": False,
+            "syn": ["ordre de preference", "ordre", "rang", "priorite", "preference", "rank", "choix"],
+        },
+        "level": {
+            "required": False,
+            "syn": ["formation", "niveau", "level", "promotion", "parcours"],
         },
         "modules": {
             "required": False,
@@ -281,10 +299,25 @@ def kinds_from(v: str) -> str:
     return ",".join(out) or "lecture,td,tp"
 
 
+def level_name(raw: dict, field: str) -> str:
+    """'L3' + 'ISIL' -> 'L3 ISIL' when the file splits the level into two columns."""
+    year, spec = (raw.get("year") or "").strip(), (raw.get("speciality") or "").strip()
+    if year and spec:
+        return year if normalize(spec) in normalize(year) else f"{year} {spec}"
+    return (raw.get(field) or year or spec or "").strip()
+
+
+def is_hours(header: str) -> bool:
+    """'Charge max (h/sem)', 'Volume horaire'... : the value is in hours, not sessions."""
+    h = normalize(header)
+    return bool(re.search(r"\bh\b|heure|horaire|hours", h))
+
+
 def clean_rows(
-    kind: str, headers: list[str], rows: list[list[str]], mapping: dict
+    kind: str, headers: list[str], rows: list[list[str]], mapping: dict, session_hours: float = 1.5
 ) -> tuple[list[dict], list[str]]:
-    """Apply the mapping and clean every value. Returns (rows as dicts, warnings)."""
+    """Apply the mapping and clean every value. Returns (rows as dicts, warnings).
+    `session_hours` (length of one time slot) converts a load given in hours into sessions."""
     out, warnings = [], []
     # Many lists split "Nom" and "Prénom" so glue the first name back onto the name.
     first_name_col = next(
@@ -308,12 +341,12 @@ def clean_rows(
             if row["capacity"] is None:
                 warnings.append(f"row {n}: capacity missing for room '{row['name']}'")
         elif kind == "levels":
-            row["name"] = raw.get("name", "")
+            row["name"] = level_name(raw, "name")
             row["headcount"] = to_int(raw.get("headcount", ""))
             if row["headcount"] is None:
                 warnings.append(f"row {n}: headcount missing for '{row['name']}'")
         elif kind == "modules":
-            row["level"] = raw.get("level", "")
+            row["level"] = level_name(raw, "level")
             row["name"] = raw.get("name", "")
             for f in ("lecture", "td", "tp"):
                 val = to_sessions(raw.get(f, ""))
@@ -332,6 +365,10 @@ def clean_rows(
             row["max_sessions"] = to_int(
                 raw.get("max_sessions", "")
             )  # empty = department default
+            if row["max_sessions"] and is_hours(mapping["max_sessions"]["column"]):
+                row["max_sessions"] = max(1, round(row["max_sessions"] / session_hours))
+            row["rank"] = to_int(raw.get("rank", ""))
+            row["level"] = (raw.get("level") or "").strip()
             mods = re.split(r"[;,/\n]+", raw.get("modules", "") or "")
             row["modules"] = [m.strip() for m in mods if m.strip()]
             row["kinds"] = kinds_from(raw.get("kinds", ""))

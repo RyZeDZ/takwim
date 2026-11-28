@@ -115,3 +115,32 @@ def test_import_errors_and_overrides(client, admin):
     assert p["mapping"]["capacity"]["method"] == "admin"
     kinds = client.get("/admin/import/kinds", headers=admin).json()
     assert set(kinds) == {"rooms", "levels", "modules", "professors"}
+
+
+def test_department_style_files(client, admin):
+    """Files as a department writes them: the level split into year + speciality, a wish list
+    with one wish per row and its order of preference, and a load given in hours."""
+    def go(kind, name, text):
+        p = preview(client, admin, kind, name, text.encode()).json()
+        assert p["ready"], p
+        r = client.post("/admin/import/commit", headers=admin, json={"kind": kind, "rows": p["rows"]})
+        assert r.status_code == 200, r.text
+        return p, r.json()
+
+    p, _ = go("levels", "niveaux.csv",
+              "Année;Spécialité;Intitulé de la formation;Effectif\n"
+              "L3;ISIL;Licence 3 ISIL;70\nL3;SI;Licence 3 SI;60\n")
+    assert [r["name"] for r in p["rows"]] == ["L3 ISIL", "L3 SI"]
+    _, res = go("modules", "modules.csv",
+                "Intitulé du module;Année;Spécialité;Cours/sem;TD/sem;TP/sem\n"
+                "Compilation;L3;ISIL;1;1;1\nCompilation;L3;SI;1;1;0\n")
+    assert res["created"] == 2 and not res["warnings"]
+    p, res = go("professors", "fiche_voeux.csv",
+                "Nom & Prénom;Charge max (h/sem);Module souhaité;Formation;Nature (Cours/TD/TP);Ordre de préférence\n"
+                "Anis Test;15;Compilation;L3-SI;Cours/TD;2\n")
+    assert p["rows"][0]["max_sessions"] == 10  # 15 h / 1h30 sessions
+    prof = next(x for x in client.get("/admin/professors", headers=admin).json() if x["name"] == "Anis Test")
+    levels = {lv["name"]: lv["id"] for lv in client.get("/admin/levels", headers=admin).json()}
+    mods = {m["id"]: m for m in client.get("/admin/modules", headers=admin).json()}
+    assert len(prof["teaches"]) == 1 and prof["teaches"][0]["rank"] == 2
+    assert mods[prof["teaches"][0]["module_id"]]["level_id"] == levels["L3 SI"]

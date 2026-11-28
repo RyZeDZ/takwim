@@ -65,6 +65,12 @@ def _greedy_start(data):
         return []
 
 
+def _greedy_full(data):
+    from app.services import fallback_solver
+
+    return fallback_solver.solve(data)
+
+
 def solve(data: dict) -> dict:
     time_limit, workers = _settings()
     n_days, n_slots = len(data["days"]), len(data["slots"])
@@ -254,14 +260,20 @@ def solve(data: dict) -> dict:
     model.Minimize(sum(penalties))
 
     # Start the search from the greedy solver's result: it is valid and already keeps the
-    # current timetable where it can, so the search only has to improve it.
-    for a in _greedy_start(data):
-        ti = a["day"] * n_slots + a["slot"]
-        if (a["requirement_id"], a["prof_id"], ti) in w:
-            model.AddHint(w[a["requirement_id"], a["prof_id"], ti], 1)
-        c = class_of_room.get(a["room_id"])
-        if (a["requirement_id"], ti, c) in x:
-            model.AddHint(x[a["requirement_id"], ti, c], 1)
+    # current timetable where it can, so the search only has to improve it. Every choice
+    # variable gets a hint (1 = what the greedy result did, 0 = the rest).
+    greedy = _greedy_start(data)
+    chosen_w = {(a["requirement_id"], a["prof_id"], a["day"] * n_slots + a["slot"]) for a in greedy}
+    chosen_x = {(a["requirement_id"], a["day"] * n_slots + a["slot"], class_of_room.get(a["room_id"]))
+                for a in greedy}
+    if greedy:
+        for key, v in w.items():
+            model.AddHint(v, key in chosen_w)
+        for key, v in x.items():
+            model.AddHint(v, key in chosen_x)
+        placed_ids = {a["requirement_id"] for a in greedy}
+        for rid, v in skip.items():
+            model.AddHint(v, rid not in placed_ids)
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit
@@ -271,6 +283,13 @@ def solve(data: dict) -> dict:
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         raise RuntimeError(f"CP-SAT found no timetable within {time_limit:.0f} s "
                            f"(status {solver.StatusName(status)})")
+    n_skipped = sum(solver.Value(v) for v in skip.values())
+    if greedy and len(reqs) - n_skipped < len(greedy):
+        # Safety net: with too little time the search may end on a worse timetable than its
+        # starting point. Never place fewer sessions than the greedy solver did.
+        result = _greedy_full(data)
+        result["stats"] = {"status": "KEPT_GREEDY_START", "seconds": round(solver.WallTime(), 2)}
+        return result
 
     assignments, unscheduled = [], []
     placed = {}

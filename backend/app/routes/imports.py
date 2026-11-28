@@ -11,6 +11,7 @@ from ..auth import log, require_admin
 from ..db import get_db
 from ..importers.mapping import FIELDS, clean_rows, map_columns
 from ..importers.readers import ImportError_, read_table
+from ..rules import get_rules
 from ..schemas import ImportCommitIn
 from ..services.catalog import commit_rows
 
@@ -19,6 +20,13 @@ router = APIRouter(
 )
 
 MAX_BYTES = 10 * 1024 * 1024
+
+
+def session_hours(rules) -> float:
+    """Length of one time slot in hours (to turn a load in hours into sessions)."""
+    start, end = rules.time_slots[0].split("-")
+    minutes = (int(end[:2]) * 60 + int(end[3:])) - (int(start[:2]) * 60 + int(start[3:]))
+    return minutes / 60 or 1.5
 
 
 @router.get("/kinds")
@@ -38,6 +46,7 @@ async def preview(
     kind: str = Form(...),
     file: UploadFile = File(...),
     column_overrides: str | None = Form(None),
+    db: DB = Depends(get_db),
 ):
     """`column_overrides` (optional) is JSON like {"capacity": "Nb places"} when the admin
     corrects a column the automatic matching got wrong."""
@@ -78,7 +87,8 @@ async def preview(
             for f, sp in FIELDS[kind].items()
             if sp["required"] and f not in result["mapping"]
         ]
-    cleaned, warnings = clean_rows(kind, headers, rows, result["mapping"])
+    cleaned, warnings = clean_rows(kind, headers, rows, result["mapping"],
+                                   session_hours=session_hours(get_rules(db)))
     return {
         "kind": kind,
         "filename": file.filename,
